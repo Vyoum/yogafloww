@@ -112,7 +112,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitc
             onClick={async () => {
               setIsGoogleLoading(true);
               setError('');
-              handleGoogleSignIn(
+              await handleGoogleSignIn(
                 async (googleUser) => {
                   const success = await loginWithGoogle(googleUser);
                   if (success) {
@@ -307,7 +307,7 @@ export const SignupModal: React.FC<SignupModalProps> = ({ isOpen, onClose, onSwi
             onClick={async () => {
               setIsGoogleLoading(true);
               setError('');
-              handleGoogleSignIn(
+              await handleGoogleSignIn(
                 async (googleUser) => {
                   const success = await loginWithGoogle(googleUser);
                   if (success) {

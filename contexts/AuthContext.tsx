@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
+import { auth } from '../config/firebase';
 
 interface User {
   id: string;
@@ -23,15 +25,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // Load user from localStorage on mount
-    const savedUser = localStorage.getItem('yogaFlowUser');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        console.error('Error loading user data:', e);
+    // Listen for Firebase auth state changes
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        // User is signed in with Firebase
+        const userData: User = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'User',
+          email: firebaseUser.email || '',
+          joinDate: firebaseUser.metadata.creationTime || new Date().toISOString(),
+        };
+        setUser(userData);
+        localStorage.setItem('yogaFlowUser', JSON.stringify(userData));
+      } else {
+        // User is signed out, check localStorage for manual login
+        const savedUser = localStorage.getItem('yogaFlowUser');
+        if (savedUser) {
+          try {
+            const parsedUser = JSON.parse(savedUser);
+            // Only use localStorage user if it's not a Firebase user (has password)
+            const users = JSON.parse(localStorage.getItem('yogaFlowUsers') || '[]');
+            const foundUser = users.find((u: any) => u.email === parsedUser.email);
+            if (foundUser && foundUser.password) {
+              setUser(parsedUser);
+            } else {
+              setUser(null);
+              localStorage.removeItem('yogaFlowUser');
+            }
+          } catch (e) {
+            console.error('Error loading user data:', e);
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
       }
-    }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -88,40 +119,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = async (googleUser: { name: string; email: string; picture?: string }): Promise<boolean> => {
-    // In a real app, this would verify the Google token with your backend
-    // For now, we'll check if user exists or create a new one
-    const users = JSON.parse(localStorage.getItem('yogaFlowUsers') || '[]');
-    let foundUser = users.find((u: any) => u.email === googleUser.email);
-
-    if (!foundUser) {
-      // Create new user from Google account
-      const newUser = {
-        id: Date.now().toString(),
-        name: googleUser.name,
-        email: googleUser.email,
-        password: null, // No password for Google users
-        joinDate: new Date().toISOString(),
-        provider: 'google',
-        picture: googleUser.picture,
-      };
-      users.push(newUser);
-      localStorage.setItem('yogaFlowUsers', JSON.stringify(users));
-      foundUser = newUser;
-    }
-
-    const userData = {
-      id: foundUser.id,
-      name: foundUser.name,
-      email: foundUser.email,
-      plan: foundUser.plan,
-      joinDate: foundUser.joinDate,
-    };
-    setUser(userData);
-    localStorage.setItem('yogaFlowUser', JSON.stringify(userData));
+    // This function is called after successful Firebase Google Sign-In
+    // The user state is already updated by onAuthStateChanged listener
+    // We just need to return true to indicate success
+    // The actual authentication is handled by Firebase in handleGoogleSignIn
     return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // Sign out from Firebase if user is signed in with Firebase
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await firebaseSignOut(auth);
+      }
+    } catch (error) {
+      console.error('Error signing out from Firebase:', error);
+    }
+    
+    // Clear local state
     setUser(null);
     localStorage.removeItem('yogaFlowUser');
   };
