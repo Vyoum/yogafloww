@@ -1,8 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from './Button';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User } from 'lucide-react';
 import { LOGO_URL } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
+import { LoginModal, SignupModal } from './LoginModal';
+import { ProfileDropdown } from './ProfileDropdown';
 
 interface NavbarProps {
   onNavHome: () => void;
@@ -32,6 +35,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -126,6 +133,43 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Start Free Month
           </Button>
+          
+          {/* Profile Icon */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                if (isAuthenticated) {
+                  setIsProfileDropdownOpen(!isProfileDropdownOpen);
+                } else {
+                  setIsLoginModalOpen(true);
+                }
+              }}
+              className={`relative flex items-center justify-center rounded-full transition-all duration-300 hover:scale-110 active:scale-95 ${
+                isScrolled 
+                  ? 'w-9 h-9' 
+                  : 'w-10 h-10'
+              } ${
+                isAuthenticated 
+                  ? 'bg-teal-600 text-white shadow-lg hover:shadow-xl' 
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+              aria-label={isAuthenticated ? 'Profile' : 'Login'}
+            >
+              {isAuthenticated && user ? (
+                <span className="font-bold text-sm">
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+              ) : (
+                <User size={isScrolled ? 16 : 18} />
+              )}
+            </button>
+            {isAuthenticated && (
+              <ProfileDropdown
+                isOpen={isProfileDropdownOpen}
+                onClose={() => setIsProfileDropdownOpen(false)}
+              />
+            )}
+          </div>
         </div>
 
         <button 
@@ -183,7 +227,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </a>
             ))}
           </div>
-          <div className="mt-auto pt-12">
+          <div className="mt-auto pt-12 space-y-4">
             <Button 
               onClick={() => { setIsMobileMenuOpen(false); onNavPricing(); }}
               variant="primary" 
@@ -192,9 +236,58 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               Start Free Month
             </Button>
+            
+            {/* Mobile Profile Button */}
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                if (isAuthenticated) {
+                  setIsProfileDropdownOpen(true);
+                } else {
+                  setIsLoginModalOpen(true);
+                }
+              }}
+              className={`w-full flex items-center justify-center gap-3 rounded-3xl py-6 font-bold transition-all ${
+                isAuthenticated
+                  ? 'bg-teal-600 text-white shadow-2xl hover:bg-teal-700'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {isAuthenticated && user ? (
+                <>
+                  <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-bold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span>Profile</span>
+                </>
+              ) : (
+                <>
+                  <User size={20} />
+                  <span>Login / Sign Up</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onSwitchToSignup={() => {
+          setIsLoginModalOpen(false);
+          setIsSignupModalOpen(true);
+        }}
+      />
+      <SignupModal
+        isOpen={isSignupModalOpen}
+        onClose={() => setIsSignupModalOpen(false)}
+        onSwitchToLogin={() => {
+          setIsSignupModalOpen(false);
+          setIsLoginModalOpen(true);
+        }}
+      />
     </>
   );
 };

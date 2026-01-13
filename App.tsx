@@ -18,8 +18,9 @@ import { Asanas } from './components/Asanas';
 import { Research } from './components/Research';
 import { Contact } from './components/Contact';
 import { CustomCursor } from './components/CustomCursor';
+import { AuthProvider } from './contexts/AuthContext';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research'>('home');
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
 
@@ -158,6 +159,14 @@ const App: React.FC = () => {
         isHomePage={view === 'home'}
       />
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
