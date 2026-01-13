@@ -1,15 +1,69 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SectionHeading } from './SectionHeading';
 import { PRICING_TIERS } from '../constants';
 import { Button } from './Button';
 import { Check, ShieldCheck, Zap, Star } from 'lucide-react';
 import { Reveal } from './Reveal';
 import { initiateRazorpayPayment } from '../utils/razorpay';
+import { useAuth } from '../contexts/AuthContext';
+import { LoginModal, SignupModal } from './LoginModal';
 
-export const Pricing: React.FC = () => {
+interface PricingProps {
+  onShowLogin?: () => void;
+}
+
+export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
+  const { isAuthenticated } = useAuth();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [pendingPurchase, setPendingPurchase] = useState<typeof PRICING_TIERS[0] | null>(null);
+
+  // Proceed with purchase after successful login/signup
+  useEffect(() => {
+    if (isAuthenticated && pendingPurchase) {
+      const tier = pendingPurchase;
+      const priceMatch = tier.price.match(/\d+/);
+      const amount = priceMatch ? parseFloat(priceMatch[0]) : 0;
+
+      if (amount > 0) {
+        // Small delay to ensure modal is closed
+        setTimeout(() => {
+          initiateRazorpayPayment(
+            amount,
+            tier.name,
+            tier.frequency,
+            (response) => {
+              // Payment successful
+              console.log('Payment successful:', response);
+              alert(`Payment successful! Welcome to ${tier.name}. Your payment ID: ${response.razorpay_payment_id}`);
+              setPendingPurchase(null);
+              // Here you would typically redirect to a success page or update user status
+            },
+            (error) => {
+              // Payment failed or cancelled
+              console.error('Payment error:', error);
+              setPendingPurchase(null);
+              if (error.message !== 'Payment cancelled by user') {
+                alert('Payment failed. Please try again or contact support.');
+              }
+            }
+          );
+        }, 300);
+      }
+    }
+  }, [isAuthenticated, pendingPurchase]);
+
   const handlePurchase = (tier: typeof PRICING_TIERS[0]) => {
-    // Extract numeric value from price string (e.g., "$49" -> 49)
+    // Check if user is logged in
+    if (!isAuthenticated) {
+      // Store the purchase intent and show login modal
+      setPendingPurchase(tier);
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    // User is logged in, proceed with payment
     const priceMatch = tier.price.match(/\d+/);
     const amount = priceMatch ? parseFloat(priceMatch[0]) : 0;
 
@@ -143,6 +197,36 @@ export const Pricing: React.FC = () => {
           </div>
         </Reveal>
       </div>
+
+      {/* Login/Signup Modals */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => {
+          setIsLoginModalOpen(false);
+          // Clear pending purchase if user closes modal without logging in
+          if (!isAuthenticated) {
+            setPendingPurchase(null);
+          }
+        }}
+        onSwitchToSignup={() => {
+          setIsLoginModalOpen(false);
+          setIsSignupModalOpen(true);
+        }}
+      />
+      <SignupModal
+        isOpen={isSignupModalOpen}
+        onClose={() => {
+          setIsSignupModalOpen(false);
+          // Clear pending purchase if user closes modal without signing up
+          if (!isAuthenticated) {
+            setPendingPurchase(null);
+          }
+        }}
+        onSwitchToLogin={() => {
+          setIsSignupModalOpen(false);
+          setIsLoginModalOpen(true);
+        }}
+      />
     </section>
   );
 };

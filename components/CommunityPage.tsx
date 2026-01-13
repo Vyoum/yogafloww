@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Reveal } from './Reveal';
-import { Search, Plus, MessageSquare, Users, Settings, Info, Send, Smile, Paperclip, X, FileText } from 'lucide-react';
+import { Search, Plus, MessageSquare, Users, Settings, Info, Send, Smile, Paperclip, X, FileText, Heart, Shield } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -22,9 +22,11 @@ interface Conversation {
   unreadCount?: number;
   isGroup?: boolean;
   members?: number;
+  isSupportGroup?: boolean;
 }
 
 const INITIAL_CONVERSATIONS: Conversation[] = [
+  { id: 'support', author: 'Support Group', avatar: 'SG', lastText: 'Remember: You\'re not alone in this journey...', time: 'Just now', unreadCount: 3, isGroup: true, isSupportGroup: true, members: 24 },
   { id: '1', author: 'Sarah Johnson', avatar: 'SJ', lastText: 'Of course! What would you like...', time: '1h', unreadCount: 1 },
   { id: '2', author: "Beginner's Circle", avatar: 'BC', lastText: 'I use the Manduka PROlite and...', time: '1h', unreadCount: 2, isGroup: true, members: 5 },
   { id: '3', author: 'Raj Patel', avatar: 'RP', lastText: "Keep practicing and you'll mast...", time: '2h' },
@@ -34,6 +36,15 @@ const INITIAL_CONVERSATIONS: Conversation[] = [
 ];
 
 const INITIAL_HISTORIES: Record<string, ChatMessage[]> = {
+  'support': [
+    { id: 's1', sender: 'Pawan (Instructor)', avatar: 'PN', text: "Welcome to the Support Group! This is a safe space for sharing challenges, victories, and everything in between. Remember: progress isn't linear, and every small step counts. 🙏", time: '9:00 AM', isMe: false },
+    { id: 's2', sender: 'Elena D.', avatar: 'ED', text: "Thank you for creating this space. I've been struggling with consistency this week. Any tips?", time: '9:15 AM', isMe: false },
+    { id: 's3', sender: 'Michael T.', avatar: 'MT', text: "Elena, I found that setting a specific time each day helps. Even if it's just 10 minutes, consistency beats intensity. You've got this! 💪", time: '9:20 AM', isMe: false },
+    { id: 's4', sender: 'Aradhna (Instructor)', avatar: 'AU', text: "Beautiful advice, Michael! Also, remember that rest days are part of the practice. Listen to your body - it's your best teacher.", time: '9:25 AM', isMe: false },
+    { id: 's5', sender: 'Sarah J.', avatar: 'SJ', text: "I had a breakthrough today! After 3 months, I finally touched my toes without bending my knees. Small wins matter! 🎉", time: '10:00 AM', isMe: false },
+    { id: 's6', sender: 'Raj P.', avatar: 'RP', text: "That's amazing, Sarah! Celebrating with you. This group has been such a source of motivation for me.", time: '10:05 AM', isMe: false },
+    { id: 's7', sender: 'Support Group', avatar: 'SG', text: "Remember: You're not alone in this journey. We're all here to support each other. If you're having a tough day, reach out - someone is always here to listen. ❤️", time: '11:00 AM', isMe: false },
+  ],
   '1': [
     { id: 'm1', sender: 'Sarah Johnson', avatar: 'SJ', text: "Hi! I was wondering if you recommend any specific props for the evening Nidra?", time: '12:30 PM', isMe: false },
     { id: 'm2', sender: 'Me', avatar: 'ME', text: "Definitely a bolster and a light eye mask. It makes a huge difference!", time: '12:35 PM', isMe: true },
@@ -136,9 +147,14 @@ export const CommunityPage: React.FC = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-serif font-bold text-slate-900">Messages</h2>
-                <button className="p-2 bg-teal-500 text-white rounded-full hover:bg-teal-600 transition-colors shadow-lg shadow-teal-500/20">
-                  <Plus size={20} />
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    className="p-2 bg-teal-500 text-white rounded-full hover:bg-teal-600 transition-colors shadow-lg shadow-teal-500/20"
+                    title="New conversation"
+                  >
+                    <Plus size={20} />
+                  </button>
+                </div>
               </div>
 
               <div className="relative mb-6">
@@ -179,13 +195,23 @@ export const CommunityPage: React.FC = () => {
                   }`}
                 >
                   <div className="relative shrink-0">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xs font-bold font-serif ${
-                      msg.isGroup ? 'bg-orange-50 text-orange-600' : 'bg-teal-100 text-teal-700'
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xs font-bold font-serif relative ${
+                      msg.isSupportGroup 
+                        ? 'bg-pink-50 text-pink-600 border-2 border-pink-200' 
+                        : msg.isGroup 
+                        ? 'bg-orange-50 text-orange-600' 
+                        : 'bg-teal-100 text-teal-700'
                     }`}>
-                      {msg.avatar}
+                      {msg.isSupportGroup ? (
+                        <Heart size={18} className="text-pink-600" fill="currentColor" />
+                      ) : (
+                        msg.avatar
+                      )}
                     </div>
                     {msg.unreadCount && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-teal-500 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white font-bold">
+                      <div className={`absolute -top-1 -right-1 w-5 h-5 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white font-bold ${
+                        msg.isSupportGroup ? 'bg-pink-500' : 'bg-teal-500'
+                      }`}>
                         {msg.unreadCount}
                       </div>
                     )}
@@ -212,14 +238,37 @@ export const CommunityPage: React.FC = () => {
                 <div className="p-6 bg-white border-b border-slate-100 flex items-center justify-between z-10">
                   <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold font-serif ${
-                      selectedConversation.isGroup ? 'bg-orange-50 text-orange-600' : 'bg-teal-100 text-teal-700'
+                      selectedConversation.isSupportGroup 
+                        ? 'bg-pink-50 text-pink-600 border-2 border-pink-200' 
+                        : selectedConversation.isGroup 
+                        ? 'bg-orange-50 text-orange-600' 
+                        : 'bg-teal-100 text-teal-700'
                     }`}>
-                      {selectedConversation.avatar}
+                      {selectedConversation.isSupportGroup ? (
+                        <Heart size={18} className="text-pink-600" fill="currentColor" />
+                      ) : (
+                        selectedConversation.avatar
+                      )}
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-900">{selectedConversation.author}</h3>
-                      <p className="text-[10px] text-teal-600 font-bold uppercase tracking-widest">
-                        {selectedConversation.isGroup ? 'Community Circle' : 'Direct Message'}
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-slate-900">{selectedConversation.author}</h3>
+                        {selectedConversation.isSupportGroup && (
+                          <Shield size={14} className="text-pink-500" />
+                        )}
+                      </div>
+                      <p className={`text-[10px] font-bold uppercase tracking-widest ${
+                        selectedConversation.isSupportGroup 
+                          ? 'text-pink-600' 
+                          : selectedConversation.isGroup 
+                          ? 'text-teal-600' 
+                          : 'text-teal-600'
+                      }`}>
+                        {selectedConversation.isSupportGroup 
+                          ? 'Support Group • Safe Space' 
+                          : selectedConversation.isGroup 
+                          ? 'Community Circle' 
+                          : 'Direct Message'}
                       </p>
                     </div>
                   </div>
@@ -356,20 +405,51 @@ export const CommunityPage: React.FC = () => {
               {selectedConversation ? (
                 <>
                   <div className={`w-20 h-20 rounded-3xl mb-6 flex items-center justify-center text-2xl font-bold font-serif ${
-                    selectedConversation.isGroup ? 'bg-orange-50 text-orange-600' : 'bg-teal-100 text-teal-700'
+                    selectedConversation.isSupportGroup 
+                      ? 'bg-pink-50 text-pink-600 border-2 border-pink-200' 
+                      : selectedConversation.isGroup 
+                      ? 'bg-orange-50 text-orange-600' 
+                      : 'bg-teal-100 text-teal-700'
                   }`}>
-                    {selectedConversation.avatar}
+                    {selectedConversation.isSupportGroup ? (
+                      <Heart size={32} className="text-pink-600" fill="currentColor" />
+                    ) : (
+                      selectedConversation.avatar
+                    )}
                   </div>
-                  <h3 className="text-xl font-serif font-bold text-slate-900 mb-1">{selectedConversation.author}</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-8">
-                    {selectedConversation.isGroup ? `${selectedConversation.members} Members Online` : 'Available to chat'}
+                  <div className="flex items-center gap-2 justify-center mb-1">
+                    <h3 className="text-xl font-serif font-bold text-slate-900">{selectedConversation.author}</h3>
+                    {selectedConversation.isSupportGroup && (
+                      <Shield size={18} className="text-pink-500" />
+                    )}
+                  </div>
+                  <p className={`text-[10px] font-bold uppercase tracking-widest mb-2 ${
+                    selectedConversation.isSupportGroup ? 'text-pink-600' : 'text-slate-400'
+                  }`}>
+                    {selectedConversation.isSupportGroup 
+                      ? 'Safe Space for Support & Growth' 
+                      : selectedConversation.isGroup 
+                      ? `${selectedConversation.members} Members Online` 
+                      : 'Available to chat'}
                   </p>
+                  {selectedConversation.isSupportGroup && (
+                    <p className="text-xs text-slate-500 mb-8 max-w-[200px] leading-relaxed">
+                      A compassionate community where you can share challenges, celebrate wins, and find encouragement from fellow practitioners and instructors.
+                    </p>
+                  )}
+                  {!selectedConversation.isSupportGroup && (
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-8">
+                      {selectedConversation.isGroup ? `${selectedConversation.members} Members Online` : 'Available to chat'}
+                    </p>
+                  )}
 
                   <div className="w-full space-y-6 text-left pt-6 border-t border-slate-50">
                     <div className="space-y-2">
                        <h4 className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">About</h4>
                        <p className="text-xs text-slate-500 leading-relaxed">
-                         {selectedConversation.isGroup 
+                         {selectedConversation.isSupportGroup
+                           ? "A safe, supportive space where members share challenges, victories, and encouragement. Instructors are active here to provide guidance and support. All members are welcome to ask questions, share struggles, and celebrate progress together."
+                           : selectedConversation.isGroup 
                            ? "A collaborative space for all students in the 6-month transformation program to discuss techniques and progress."
                            : "Direct connection with your peer to share personal journey insights and support."
                          }

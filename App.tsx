@@ -48,6 +48,8 @@ const AppContent: React.FC = () => {
 
   const handleNavPricing = () => {
     setView('pricing');
+    // Scroll to top when navigating to pricing
+    window.scrollTo(0, 0);
   };
 
   const handleNavCommunity = () => {

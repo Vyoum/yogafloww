@@ -38,7 +38,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [shouldNavigateToPricing, setShouldNavigateToPricing] = useState(false);
   const { isAuthenticated, user } = useAuth();
+
+  // Navigate to pricing after successful login if triggered from "Start Free Month"
+  useEffect(() => {
+    if (isAuthenticated && shouldNavigateToPricing) {
+      setShouldNavigateToPricing(false);
+      onNavPricing();
+    }
+  }, [isAuthenticated, shouldNavigateToPricing, onNavPricing]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -126,7 +135,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             </a>
           ))}
           <Button 
-            onClick={onNavPricing} 
+            onClick={() => {
+              // Check if user is logged in before navigating to pricing
+              if (!isAuthenticated) {
+                setShouldNavigateToPricing(true);
+                setIsLoginModalOpen(true);
+              } else {
+                onNavPricing();
+              }
+            }}
             variant="primary" 
             size="sm" 
             className={`rounded-full shadow-none hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-500 ${isScrolled ? 'px-5 py-2 text-[9px]' : 'px-7 py-3'}`}
@@ -229,7 +246,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div className="mt-auto pt-12 space-y-4">
             <Button 
-              onClick={() => { setIsMobileMenuOpen(false); onNavPricing(); }}
+              onClick={() => { 
+                setIsMobileMenuOpen(false);
+                // Check if user is logged in before navigating to pricing
+                if (!isAuthenticated) {
+                  setShouldNavigateToPricing(true);
+                  setIsLoginModalOpen(true);
+                } else {
+                  onNavPricing();
+                }
+              }}
               variant="primary" 
               size="lg" 
               className="w-full rounded-3xl shadow-2xl py-6 font-bold tracking-[0.2em] text-sm uppercase"
@@ -274,7 +300,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Modals */}
       <LoginModal
         isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
+        onClose={() => {
+          setIsLoginModalOpen(false);
+          setShouldNavigateToPricing(false);
+        }}
         onSwitchToSignup={() => {
           setIsLoginModalOpen(false);
           setIsSignupModalOpen(true);
@@ -282,7 +311,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       />
       <SignupModal
         isOpen={isSignupModalOpen}
-        onClose={() => setIsSignupModalOpen(false)}
+        onClose={() => {
+          setIsSignupModalOpen(false);
+          setShouldNavigateToPricing(false);
+        }}
         onSwitchToLogin={() => {
           setIsSignupModalOpen(false);
           setIsLoginModalOpen(true);
