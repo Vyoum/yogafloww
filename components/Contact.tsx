@@ -69,7 +69,7 @@ export const Contact: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Email Us</h4>
-                    <p className="text-lg font-medium text-slate-900">hello@yogaflow.com</p>
+                    <p className="text-lg font-medium text-slate-900">parth@yogaflow.com</p>
                     <p className="text-sm text-slate-500">Average response: 4 hours</p>
                   </div>
                 </div>
