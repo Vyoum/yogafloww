@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { SectionHeading } from './SectionHeading';
-import { PRICING_TIERS } from '../constants';
+import { PRICING_TIERS_INR, PRICING_TIERS_USD } from '../constants';
+import { PricingTier } from '../types';
 import { Button } from './Button';
-import { Check, ShieldCheck, Zap, Star } from 'lucide-react';
+import { Check, ShieldCheck, Zap, Star, Globe } from 'lucide-react';
 import { Reveal } from './Reveal';
 import { initiateRazorpayPayment } from '../utils/razorpay';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,38 +18,84 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
   const { isAuthenticated } = useAuth();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
-  const [pendingPurchase, setPendingPurchase] = useState<typeof PRICING_TIERS[0] | null>(null);
+  const [pendingPurchase, setPendingPurchase] = useState<PricingTier | null>(null);
+  const [isIndia, setIsIndia] = useState<boolean>(true);
+  const [showCurrencyToggle, setShowCurrencyToggle] = useState<boolean>(false);
+
+  // Detect user location on component mount
+  useEffect(() => {
+    // Check timezone first (quick check)
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const isIndiaTimezone = timezone.includes('Calcutta') || timezone.includes('Kolkata') || timezone.includes('Asia/Kolkata');
+    
+    // Check browser language
+    const language = navigator.language || (navigator as any).userLanguage;
+    const isIndiaLanguage = language.includes('en-IN') || language.includes('hi');
+    
+    // Try to get more accurate location via IP (fallback to timezone/language)
+    fetch('https://ipapi.co/json/')
+      .then(res => res.json())
+      .then(data => {
+        if (data.country_code === 'IN') {
+          setIsIndia(true);
+        } else if (data.country_code) {
+          setIsIndia(false);
+        } else {
+          // Fallback to timezone/language detection
+          setIsIndia(isIndiaTimezone || isIndiaLanguage);
+        }
+        setShowCurrencyToggle(true);
+      })
+      .catch(() => {
+        // Fallback to timezone/language detection if IP API fails
+        setIsIndia(isIndiaTimezone || isIndiaLanguage);
+        setShowCurrencyToggle(true);
+      });
+  }, []);
+
+  const currentPricingTiers = isIndia ? PRICING_TIERS_INR : PRICING_TIERS_USD;
 
   // Proceed with purchase after successful login/signup
   useEffect(() => {
     if (isAuthenticated && pendingPurchase) {
       const tier = pendingPurchase;
-      const priceMatch = tier.price.match(/\d+/);
+      const isUSD = tier.price.includes('$');
+      
+      // Extract numeric value from price string
+      const priceMatch = tier.price.replace(/[₹$,]/g, '').match(/\d+/);
       const amount = priceMatch ? parseFloat(priceMatch[0]) : 0;
 
       if (amount > 0) {
         // Small delay to ensure modal is closed
         setTimeout(() => {
-          initiateRazorpayPayment(
-            amount,
-            tier.name,
-            tier.frequency,
-            (response) => {
-              // Payment successful
-              console.log('Payment successful:', response);
-              alert(`Payment successful! Welcome to ${tier.name}. Your payment ID: ${response.razorpay_payment_id}`);
-              setPendingPurchase(null);
-              // Here you would typically redirect to a success page or update user status
-            },
-            (error) => {
-              // Payment failed or cancelled
-              console.error('Payment error:', error);
-              setPendingPurchase(null);
-              if (error.message !== 'Payment cancelled by user') {
-                alert('Payment failed. Please try again or contact support.');
+          if (isUSD) {
+            // For USD payments, show a message (Razorpay is INR only)
+            // In production, you'd integrate with Stripe or another international payment gateway
+            alert('International payments coming soon! For now, please contact support at support@yogaflow.com to complete your purchase.');
+            setPendingPurchase(null);
+          } else {
+            // INR payments via Razorpay
+            initiateRazorpayPayment(
+              amount,
+              tier.name,
+              tier.frequency,
+              (response) => {
+                // Payment successful
+                console.log('Payment successful:', response);
+                alert(`Payment successful! Welcome to ${tier.name}. Your payment ID: ${response.razorpay_payment_id}`);
+                setPendingPurchase(null);
+                // Here you would typically redirect to a success page or update user status
+              },
+              (error) => {
+                // Payment failed or cancelled
+                console.error('Payment error:', error);
+                setPendingPurchase(null);
+                if (error.message !== 'Payment cancelled by user') {
+                  alert('Payment failed. Please try again or contact support.');
+                }
               }
-            }
-          );
+            );
+          }
         }, 300);
       }
     }
@@ -64,7 +111,10 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
     }
 
     // User is logged in, proceed with payment
-    const priceMatch = tier.price.match(/\d+/);
+    const isUSD = tier.price.includes('$');
+    
+    // Extract numeric value from price string
+    const priceMatch = tier.price.replace(/[₹$,]/g, '').match(/\d+/);
     const amount = priceMatch ? parseFloat(priceMatch[0]) : 0;
 
     if (amount === 0) {
@@ -72,6 +122,14 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
       return;
     }
 
+    if (isUSD) {
+      // For USD payments, show a message (Razorpay is INR only)
+      // In production, you'd integrate with Stripe or another international payment gateway
+      alert('International payments coming soon! For now, please contact support at support@yogaflow.com to complete your purchase.');
+      return;
+    }
+
+    // INR payments via Razorpay
     initiateRazorpayPayment(
       amount,
       tier.name,
@@ -107,8 +165,37 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
           />
         </Reveal>
 
+        {/* Currency Toggle */}
+        {showCurrencyToggle && (
+          <Reveal delay={0.2}>
+            <div className="flex items-center justify-center gap-4 mt-8 mb-4">
+              <button
+                onClick={() => setIsIndia(true)}
+                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                  isIndia
+                    ? 'bg-teal-600 text-white shadow-lg'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                ₹ INR
+              </button>
+              <button
+                onClick={() => setIsIndia(false)}
+                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                  !isIndia
+                    ? 'bg-teal-600 text-white shadow-lg'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                $ USD
+              </button>
+              <Globe className="text-slate-400" size={18} />
+            </div>
+          </Reveal>
+        )}
+
         <div className="grid lg:grid-cols-2 gap-10 md:gap-16 items-start mt-16 max-w-5xl mx-auto">
-          {PRICING_TIERS.map((tier, idx) => (
+          {currentPricingTiers.map((tier, idx) => (
             <Reveal key={idx} delay={idx * 0.1}>
               <div 
                 className={`relative rounded-[3rem] p-10 md:p-14 transition-all duration-700 h-full flex flex-col ${
@@ -171,7 +258,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
 
                 {tier.isRecommended && (
                   <div className="mt-8 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-teal-300 font-bold opacity-80">
-                    <Star size={14} /> 6-Month Commitment to Success
+                    <Star size={14} /> Best Value • Save 25%
                   </div>
                 )}
               </div>
@@ -183,7 +270,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
           <div className="mt-24 text-center">
               <div className="inline-block px-8 py-6 bg-teal-50/50 rounded-3xl border border-teal-100 max-w-2xl">
                 <p className="text-slate-600 text-sm leading-relaxed">
-                  Need extra guidance? 1-on-1 private sessions available for members at <span className="font-bold text-slate-900 border-b-2 border-teal-200 pb-0.5">$19/hr</span>.
+                  Need extra guidance? 1-on-1 private sessions available for members at <span className="font-bold text-slate-900 border-b-2 border-teal-200 pb-0.5">{isIndia ? '₹500/hr' : '$19/hr'}</span>.
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-6">
                    <div className="text-[10px] font-bold text-teal-600 uppercase tracking-widest flex items-center gap-2">

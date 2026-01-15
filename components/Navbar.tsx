@@ -148,7 +148,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             size="sm" 
             className={`rounded-full shadow-none hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-500 ${isScrolled ? 'px-5 py-2 text-[9px]' : 'px-7 py-3'}`}
           >
-            Start Free Month
+            View Pricing
           </Button>
           
           {/* Profile Icon */}
@@ -260,7 +260,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               size="lg" 
               className="w-full rounded-3xl shadow-2xl py-6 font-bold tracking-[0.2em] text-sm uppercase"
             >
-              Start Free Month
+              View Pricing
             </Button>
             
             {/* Mobile Profile Button */}

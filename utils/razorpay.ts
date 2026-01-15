@@ -61,11 +61,10 @@ const openRazorpayCheckout = (
   onSuccess?: (response: any) => void,
   onError?: (error: any) => void
 ) => {
-  // Convert amount to paise (INR smallest unit)
-  // Assuming amount is in USD, converting to INR (1 USD = 83 INR approximately)
-  // You may want to adjust this conversion rate
-  const amountInINR = amount * 83;
-  const amountInPaise = Math.round(amountInINR * 100);
+  // Amount is already in INR, convert to paise (INR smallest unit)
+  // Remove any commas from the amount string if present
+  const cleanAmount = typeof amount === 'string' ? parseFloat(amount.replace(/,/g, '')) : amount;
+  const amountInPaise = Math.round(cleanAmount * 100);
 
   const options: RazorpayOptions = {
     key: RAZORPAY_KEY_ID,

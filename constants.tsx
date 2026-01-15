@@ -415,9 +415,39 @@ export const INSTRUCTORS: Instructor[] = [
   }
 ];
 
-export const PRICING_TIERS: PricingTier[] = [
+export const PRICING_TIERS_INR: PricingTier[] = [
   {
-    name: 'Monthly Commitment',
+    name: 'Monthly Subscription',
+    price: '₹999',
+    frequency: '/month',
+    features: [
+      'Access to all live classes',
+      'Weekly community check-ins',
+      'Cancel anytime',
+      '7-Day Money Back Guarantee'
+    ],
+    isRecommended: false,
+    buttonText: 'Subscribe Now'
+  },
+  {
+    name: 'Full Course (6 Months)',
+    price: '₹4,499',
+    frequency: 'one-time',
+    features: [
+      'Everything in Monthly',
+      '1-on-1 Onboarding Call',
+      'Personalized adjustment plan',
+      'Priority support',
+      'Save ₹1,495 (25% off)'
+    ],
+    isRecommended: true,
+    buttonText: 'Enroll Now'
+  }
+];
+
+export const PRICING_TIERS_USD: PricingTier[] = [
+  {
+    name: 'Monthly Subscription',
     price: '$49',
     frequency: '/month',
     features: [
@@ -427,19 +457,23 @@ export const PRICING_TIERS: PricingTier[] = [
       '7-Day Money Back Guarantee'
     ],
     isRecommended: false,
-    buttonText: 'Start Free Month'
+    buttonText: 'Subscribe Now'
   },
   {
-    name: '6-Month Transformation',
-    price: '$39',
-    frequency: '/month',
+    name: 'Full Course (6 Months)',
+    price: '$249',
+    frequency: 'one-time',
     features: [
       'Everything in Monthly',
-      '1-on-1 Onboarding Call ($100 value)',
+      '1-on-1 Onboarding Call',
       'Personalized adjustment plan',
-      'Priority support'
+      'Priority support',
+      'Save $45 (15% off)'
     ],
     isRecommended: true,
-    buttonText: 'Join the Journey'
+    buttonText: 'Enroll Now'
   }
 ];
+
+// Default to INR for backward compatibility
+export const PRICING_TIERS = PRICING_TIERS_INR;
