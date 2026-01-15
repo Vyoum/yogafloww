@@ -2,18 +2,53 @@
 import React, { useState } from 'react';
 import { Reveal } from './Reveal';
 import { Button } from './Button';
-import { Mail, MessageSquare, MapPin, Send, CheckCircle2, Phone } from 'lucide-react';
+import { Mail, MessageSquare, MapPin, Send, CheckCircle2, Phone, AlertCircle } from 'lucide-react';
+import { saveContactMessage } from '../utils/contactForm';
 
 export const Contact: React.FC = () => {
-  const [formState, setFormState] = useState<'idle' | 'submitting' | 'success'>('idle');
+  const [formState, setFormState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    inquiryType: 'General Inquiry',
+    message: ''
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormState('submitting');
-    // Simulate API call
-    setTimeout(() => {
+    setErrorMessage('');
+
+    try {
+      await saveContactMessage({
+        name: formData.name,
+        email: formData.email,
+        inquiryType: formData.inquiryType,
+        message: formData.message
+      });
+      
       setFormState('success');
-    }, 1500);
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        inquiryType: 'General Inquiry',
+        message: ''
+      });
+    } catch (error: any) {
+      console.error('Error submitting contact form:', error);
+      setFormState('error');
+      setErrorMessage(error.message || 'Failed to send message. Please try again or contact us directly.');
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   if (formState === 'success') {
@@ -110,12 +145,25 @@ export const Contact: React.FC = () => {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-teal-100/30 rounded-full blur-3xl -mr-16 -mt-16"></div>
                 
                 <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
+                  {formState === 'error' && (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3">
+                      <AlertCircle className="text-red-600 shrink-0 mt-0.5" size={20} />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-900">Error sending message</p>
+                        <p className="text-xs text-red-700 mt-1">{errorMessage}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Full Name</label>
                       <input 
                         required
+                        name="name"
                         type="text" 
+                        value={formData.name}
+                        onChange={handleChange}
                         placeholder="Arjun Sharma"
                         className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-sm"
                       />
@@ -124,7 +172,10 @@ export const Contact: React.FC = () => {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email Address</label>
                       <input 
                         required
+                        name="email"
                         type="email" 
+                        value={formData.email}
+                        onChange={handleChange}
                         placeholder="arjun@example.com"
                         className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-sm"
                       />
@@ -133,7 +184,12 @@ export const Contact: React.FC = () => {
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Inquiry Type</label>
-                    <select className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-sm appearance-none cursor-pointer">
+                    <select 
+                      name="inquiryType"
+                      value={formData.inquiryType}
+                      onChange={handleChange}
+                      className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-sm appearance-none cursor-pointer"
+                    >
                       <option>General Inquiry</option>
                       <option>Membership & Billing</option>
                       <option>Technical Support</option>
@@ -145,6 +201,9 @@ export const Contact: React.FC = () => {
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Your Message</label>
                     <textarea 
                       required
+                      name="message"
+                      value={formData.message}
+                      onChange={handleChange}
                       rows={5}
                       placeholder="How can we assist your practice today?"
                       className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-sm resize-none"
