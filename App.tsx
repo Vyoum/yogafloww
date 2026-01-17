@@ -20,9 +20,10 @@ import { Contact } from './components/Contact';
 import { CustomCursor } from './components/CustomCursor';
 import { AuthProvider } from './contexts/AuthContext';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { TermsConditions } from './components/TermsConditions';
 
 const AppContent: React.FC = () => {
-  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy'>('home');
+  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms'>('home');
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,8 +80,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleNavTerms = () => {
-    // TODO: Create Terms & Conditions page
-    setView('home');
+    setView('terms');
     window.scrollTo(0, 0);
   };
 
@@ -162,6 +162,7 @@ const AppContent: React.FC = () => {
         {view === 'asanas' && <Asanas onNavPricing={handleNavPricing} />}
         {view === 'research' && <Research />}
         {view === 'privacy' && <PrivacyPolicy onBack={handleNavHome} />}
+        {view === 'terms' && <TermsConditions onBack={handleNavHome} />}
       </main>
       
       <Footer 

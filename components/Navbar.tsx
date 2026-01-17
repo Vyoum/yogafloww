@@ -260,7 +260,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               size="lg" 
               className="w-full rounded-3xl shadow-2xl py-6 font-bold tracking-[0.2em] text-sm uppercase"
             >
-              View Pricing
+              Start Free Month
             </Button>
             
             {/* Mobile Profile Button */}
