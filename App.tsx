@@ -147,7 +147,7 @@ const AppContent: React.FC = () => {
         {view === 'pricing' && <Pricing />}
         {view === 'community' && <CommunityPage />}
         {view === 'meditation' && <MeditationMusic />}
-        {view === 'asanas' && <Asanas />}
+        {view === 'asanas' && <Asanas onNavPricing={handleNavPricing} />}
         {view === 'research' && <Research />}
       </main>
       

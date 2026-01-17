@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { LoginModal, SignupModal } from './LoginModal';
 import { Reveal } from './Reveal';
 import { ASANAS, MEDITATION_TRACKS } from '../constants';
 import { Track } from '../types';
@@ -21,7 +23,35 @@ import {
   Headphones 
 } from 'lucide-react';
 
-export const Asanas: React.FC = () => {
+interface AsanasProps {
+  onNavPricing?: () => void;
+}
+
+export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [shouldNavigateToPricing, setShouldNavigateToPricing] = useState(false);
+  const { isAuthenticated } = useAuth();
+
+  // Navigate to pricing after successful login if triggered from "Join Live Workshop"
+  useEffect(() => {
+    if (isAuthenticated && shouldNavigateToPricing && onNavPricing) {
+      setShouldNavigateToPricing(false);
+      onNavPricing();
+    }
+  }, [isAuthenticated, shouldNavigateToPricing, onNavPricing]);
+
+  const handleJoinWorkshop = () => {
+    if (!isAuthenticated) {
+      // Show login modal if user is not logged in
+      setShouldNavigateToPricing(true);
+      setIsLoginModalOpen(true);
+    } else if (onNavPricing) {
+      // Navigate to pricing if user is logged in
+      onNavPricing();
+    }
+  };
+
   // --- Audio State & Logic (from MeditationMusic) ---
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -271,12 +301,39 @@ export const Asanas: React.FC = () => {
              <div className="absolute top-0 right-0 w-64 h-64 bg-teal-600/10 rounded-full blur-[100px]"></div>
              <h2 className="text-3xl md:text-5xl font-serif font-bold text-white mb-6 relative z-10">Master the basics, <br/>unlock the potential.</h2>
              <p className="text-slate-300 max-w-xl mx-auto mb-10 relative z-10">Every pose and every frequency is a doorway. Our guides help you navigate the journey inward.</p>
-             <button className="bg-teal-600 text-white px-10 py-5 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-teal-500 transition-all shadow-2xl relative z-10">
+             <button 
+               onClick={handleJoinWorkshop}
+               className="bg-teal-600 text-white px-10 py-5 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-teal-500 transition-all shadow-2xl relative z-10"
+             >
                 Join Live Workshop
              </button>
           </div>
         </Reveal>
       </div>
+
+      {/* Login/Signup Modals */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => {
+          setIsLoginModalOpen(false);
+          setShouldNavigateToPricing(false);
+        }}
+        onSwitchToSignup={() => {
+          setIsLoginModalOpen(false);
+          setIsSignupModalOpen(true);
+        }}
+      />
+      <SignupModal
+        isOpen={isSignupModalOpen}
+        onClose={() => {
+          setIsSignupModalOpen(false);
+          setShouldNavigateToPricing(false);
+        }}
+        onSwitchToLogin={() => {
+          setIsSignupModalOpen(false);
+          setIsLoginModalOpen(true);
+        }}
+      />
 
       {/* Modern High-End Floating Audio Player (Only visible when a track is active) */}
       {currentTrack && (
