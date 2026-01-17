@@ -155,9 +155,25 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
                 {indiaTime || 'Loading Time...'}
               </div>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-              © {new Date().getFullYear()} Yoga Flow Inc.
-            </p>
+            <div className="flex flex-col items-center md:items-start gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                © {new Date().getFullYear()} Yoga Flow Inc.
+              </p>
+              <div className="flex gap-4 md:gap-6">
+                <a 
+                  href="#" 
+                  className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 hover:text-teal-600 transition-colors"
+                >
+                  Terms & Conditions
+                </a>
+                <a 
+                  href="#" 
+                  className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 hover:text-teal-600 transition-colors"
+                >
+                  Privacy Policy
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
