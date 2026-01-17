@@ -19,9 +19,10 @@ import { Research } from './components/Research';
 import { Contact } from './components/Contact';
 import { CustomCursor } from './components/CustomCursor';
 import { AuthProvider } from './contexts/AuthContext';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
 
 const AppContent: React.FC = () => {
-  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research'>('home');
+  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy'>('home');
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,6 +71,17 @@ const AppContent: React.FC = () => {
 
   const handleNavHome = () => {
     setView('home');
+  };
+
+  const handleNavPrivacy = () => {
+    setView('privacy');
+    window.scrollTo(0, 0);
+  };
+
+  const handleNavTerms = () => {
+    // TODO: Create Terms & Conditions page
+    setView('home');
+    window.scrollTo(0, 0);
   };
 
   const handleContactClick = () => {
@@ -149,6 +161,7 @@ const AppContent: React.FC = () => {
         {view === 'meditation' && <MeditationMusic />}
         {view === 'asanas' && <Asanas onNavPricing={handleNavPricing} />}
         {view === 'research' && <Research />}
+        {view === 'privacy' && <PrivacyPolicy onBack={handleNavHome} />}
       </main>
       
       <Footer 
@@ -158,6 +171,8 @@ const AppContent: React.FC = () => {
         onNavAbout={handleNavAbout}
         onNavPricing={handleNavPricing}
         onNavCommunity={handleNavCommunity}
+        onNavPrivacy={handleNavPrivacy}
+        onNavTerms={handleNavTerms}
         isHomePage={view === 'home'}
       />
     </div>

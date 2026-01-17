@@ -16,10 +16,12 @@ interface FooterProps {
   onNavAbout: () => void;
   onNavPricing: () => void;
   onNavCommunity: () => void;
+  onNavPrivacy?: () => void;
+  onNavTerms?: () => void;
   isHomePage: boolean;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onNavClasses, onNavAbout, onNavPricing, onNavCommunity, isHomePage }) => {
+export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onNavClasses, onNavAbout, onNavPricing, onNavCommunity, onNavPrivacy, onNavTerms, isHomePage }) => {
   const [indiaTime, setIndiaTime] = useState<string>('');
 
   useEffect(() => {
@@ -160,18 +162,18 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
                 © {new Date().getFullYear()} Yoga Flow Inc.
               </p>
               <div className="flex gap-4 md:gap-6">
-                <a 
-                  href="#" 
+                <button 
+                  onClick={onNavTerms}
                   className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 hover:text-teal-600 transition-colors"
                 >
                   Terms & Conditions
-                </a>
-                <a 
-                  href="#" 
+                </button>
+                <button 
+                  onClick={onNavPrivacy}
                   className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 hover:text-teal-600 transition-colors"
                 >
                   Privacy Policy
-                </a>
+                </button>
               </div>
             </div>
           </div>
