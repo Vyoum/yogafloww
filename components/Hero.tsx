@@ -5,9 +5,49 @@ import { Button } from './Button';
 import { HERO_METRICS } from '../constants';
 import { Reveal } from './Reveal';
 import { ShivaPortrait } from './ShivaPortrait';
+import { useAuth } from '../contexts/AuthContext';
+import { LoginModal, SignupModal } from './LoginModal';
 
-export const Hero: React.FC = () => {
+interface HeroProps {
+  onNavPricing: () => void;
+}
+
+export const Hero: React.FC<HeroProps> = ({ onNavPricing }) => {
   const [scrollY, setScrollY] = useState(0);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [shouldNavigateToPricing, setShouldNavigateToPricing] = useState(false);
+  const { isAuthenticated } = useAuth();
+
+  // Navigate to pricing after successful login if triggered from "Start Free Month"
+  useEffect(() => {
+    if (isAuthenticated && shouldNavigateToPricing) {
+      setShouldNavigateToPricing(false);
+      onNavPricing();
+    }
+  }, [isAuthenticated, shouldNavigateToPricing, onNavPricing]);
+
+  const handleStartFreeMonth = () => {
+    if (!isAuthenticated) {
+      // Show login modal if user is not logged in
+      setShouldNavigateToPricing(true);
+      setIsLoginModalOpen(true);
+    } else {
+      // Navigate to pricing if user is logged in
+      onNavPricing();
+    }
+  };
+
+  const handleSeeJourney = () => {
+    if (!isAuthenticated) {
+      // Show login modal if user is not logged in
+      setShouldNavigateToPricing(true);
+      setIsLoginModalOpen(true);
+    } else {
+      // Navigate to pricing page if user is logged in
+      onNavPricing();
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,8 +96,22 @@ export const Hero: React.FC = () => {
 
           <Reveal delay={0.4}>
             <div className="flex flex-col sm:flex-row gap-5 pt-4">
-              <Button variant="primary" size="lg" className="rounded-full">Start Free Month</Button>
-              <Button variant="outline" size="lg" className="rounded-full">See the 6-Month Journey</Button>
+              <Button 
+                variant="primary" 
+                size="lg" 
+                className="rounded-full"
+                onClick={handleStartFreeMonth}
+              >
+                Start Free Month
+              </Button>
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="rounded-full"
+                onClick={handleSeeJourney}
+              >
+                See the 6-Month Journey
+              </Button>
             </div>
             <p className="mt-6 text-[11px] text-slate-400 uppercase tracking-widest font-bold">
               Live classes • Ancient Tradition • Beginner-safe • Real results
@@ -102,6 +156,30 @@ export const Hero: React.FC = () => {
             </div>
         </div>
       </div>
+
+      {/* Login/Signup Modals */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => {
+          setIsLoginModalOpen(false);
+          setShouldNavigateToPricing(false);
+        }}
+        onSwitchToSignup={() => {
+          setIsLoginModalOpen(false);
+          setIsSignupModalOpen(true);
+        }}
+      />
+      <SignupModal
+        isOpen={isSignupModalOpen}
+        onClose={() => {
+          setIsSignupModalOpen(false);
+          setShouldNavigateToPricing(false);
+        }}
+        onSwitchToLogin={() => {
+          setIsSignupModalOpen(false);
+          setIsLoginModalOpen(true);
+        }}
+      />
     </section>
   );
 };

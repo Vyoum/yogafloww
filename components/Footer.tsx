@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Instagram, 
-  Twitter, 
   Facebook, 
   Compass,
   Clock,
@@ -144,7 +143,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
           <div className="w-full pt-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-8">
                <a href="#" className="text-slate-400 hover:text-teal-600 transition-colors"><Instagram size={20} /></a>
-               <a href="#" className="text-slate-400 hover:text-teal-600 transition-colors"><Twitter size={20} /></a>
                <a href="#" className="text-slate-400 hover:text-teal-600 transition-colors"><Facebook size={20} /></a>
             </div>
             <div className="flex items-center gap-6">

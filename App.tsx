@@ -101,7 +101,7 @@ const AppContent: React.FC = () => {
       <main>
         {view === 'home' && (
           <>
-            <Hero />
+            <Hero onNavPricing={handleNavPricing} />
             
             <div id="journey">
               <ProblemSolution />
