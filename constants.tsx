@@ -424,7 +424,7 @@ export const PRICING_TIERS_INR: PricingTier[] = [
       'Access to all live classes',
       'Weekly community check-ins',
       'Cancel anytime',
-      '7-Day Money Back Guarantee'
+      
     ],
     isRecommended: false,
     buttonText: 'Subscribe Now'
@@ -435,8 +435,7 @@ export const PRICING_TIERS_INR: PricingTier[] = [
     frequency: 'one-time',
     features: [
       'Everything in Monthly',
-      '1-on-1 Onboarding Call',
-      'Personalized adjustment plan',
+
       'Priority support',
       'Save ₹1,495 (25% off)'
     ],
@@ -454,7 +453,7 @@ export const PRICING_TIERS_USD: PricingTier[] = [
       'Access to all live classes',
       'Weekly community check-ins',
       'Cancel anytime',
-      '7-Day Money Back Guarantee'
+   
     ],
     isRecommended: false,
     buttonText: 'Subscribe Now'
@@ -465,7 +464,7 @@ export const PRICING_TIERS_USD: PricingTier[] = [
     frequency: 'one-time',
     features: [
       'Everything in Monthly',
-      '1-on-1 Onboarding Call',
+     
       'Personalized adjustment plan',
       'Priority support',
       'Save $45 (15% off)'
