@@ -127,7 +127,9 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
 
               {/* Google Play Store Button */}
               <a 
-                href="#" 
+                href="https://play.google.com/store/apps/details?id=com.yogaflow1.app"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="group flex items-center gap-3 bg-black text-white px-6 py-3 rounded-2xl hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
                 aria-label="Get it on Google Play"
               >
