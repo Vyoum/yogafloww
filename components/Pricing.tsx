@@ -101,7 +101,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
     }
   }, [isAuthenticated, pendingPurchase]);
 
-  const handlePurchase = (tier: typeof PRICING_TIERS[0]) => {
+  const handlePurchase = (tier: PricingTier) => {
     // Check if user is logged in
     if (!isAuthenticated) {
       // Store the purchase intent and show login modal
@@ -270,7 +270,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
           <div className="mt-24 text-center">
               <div className="inline-block px-8 py-6 bg-teal-50/50 rounded-3xl border border-teal-100 max-w-2xl">
                 <p className="text-slate-600 text-sm leading-relaxed">
-                  Need extra guidance? 1-on-1 private sessions available for members at <span className="font-bold text-slate-900 border-b-2 border-teal-200 pb-0.5">{isIndia ? '₹500/hr' : '$19/hr'}</span>.
+                  Need extra guidance? 1-on-1 private sessions available for members at <span className="font-bold text-slate-900 border-b-2 border-teal-200 pb-0.5">$19/hr</span>.
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-6">
                    <div className="text-[10px] font-bold text-teal-600 uppercase tracking-widest flex items-center gap-2">

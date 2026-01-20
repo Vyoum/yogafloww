@@ -162,7 +162,7 @@ const AppContent: React.FC = () => {
           <FullInstructors onBack={handleNavHome} selectedId={selectedInstructorId} />
         )}
 
-        {view === 'classes' && <Classes initialTab={classesInitialTab} />}
+        {view === 'classes' && <Classes initialTab={classesInitialTab} onNavHome={handleNavHome} />}
         {view === 'about' && <About onContactClick={handleContactClick} />}
         {view === 'pricing' && <Pricing />}
         {view === 'community' && <CommunityPage />}

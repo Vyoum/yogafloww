@@ -7,9 +7,10 @@ import { YogaClass } from '../types';
 
 interface ClassesProps {
   initialTab?: 'live' | 'recorded';
+  onNavHome?: () => void;
 }
 
-export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live' }) => {
+export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome }) => {
   const [activeTab, setActiveTab] = useState<'live' | 'recorded'>(initialTab);
   const [filterType, setFilterType] = useState<string>('All Types');
   const [filterLevel, setFilterLevel] = useState<string>('All Levels');
@@ -20,6 +21,28 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live' }) => {
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  const handleJoinJourney = () => {
+    // Navigate to home first, then scroll to path-to-transformation
+    if (onNavHome) {
+      onNavHome();
+      // Wait for navigation and DOM update, then scroll
+      setTimeout(() => {
+        const pathToTransformationSection = document.getElementById('path-to-transformation');
+        if (pathToTransformationSection) {
+          pathToTransformationSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          // If element not found, try again after a longer delay
+          setTimeout(() => {
+            const section = document.getElementById('path-to-transformation');
+            if (section) {
+              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 300);
+        }
+      }, 150);
+    }
+  };
 
   const types = ['All Types', 'Hatha', 'Vinyasa', 'Meditation', 'Mobility'];
   const levels = ['All Levels', 'Beginner', 'Intermediate', 'All'];
@@ -297,6 +320,7 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live' }) => {
               {/* FIXED BUTTON VISIBILITY: Explicit Solid Teal Button */}
               <div className="flex justify-center">
                 <Button 
+                  onClick={handleJoinJourney}
                   variant="primary" 
                   size="lg" 
                   className="rounded-full bg-teal-600 text-white hover:bg-teal-500 px-10 md:px-14 py-4 md:py-6 shadow-2xl border-none transition-all duration-300 font-bold tracking-[0.2em] text-sm md:text-base active:scale-95"
