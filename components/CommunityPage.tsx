@@ -27,9 +27,7 @@ interface Conversation {
 
 const INITIAL_CONVERSATIONS: Conversation[] = [
   { id: 'support', author: 'Support Group', avatar: 'SG', lastText: 'Remember: You\'re not alone in this journey...', time: 'Just now', unreadCount: 3, isGroup: true, isSupportGroup: true, members: 24 },
-  { id: 'batch001', author: 'Batch 001', avatar: 'B1', lastText: 'Welcome to Batch 001! Let\'s start our journey together...', time: '30m', unreadCount: 5, isGroup: true, members: 18 },
   { id: '2', author: "Beginner's Circle", avatar: 'BC', lastText: 'I use the Manduka PROlite and...', time: '1h', unreadCount: 2, isGroup: true, members: 5 },
-  { id: '6', author: 'Morning Flow Group', avatar: 'MF', lastText: 'Who is joining the 6:30 AM class?', time: '5h', isGroup: true, members: 12 },
 ];
 
 const INITIAL_HISTORIES: Record<string, ChatMessage[]> = {
@@ -40,13 +38,6 @@ const INITIAL_HISTORIES: Record<string, ChatMessage[]> = {
     { id: 's4', sender: 'Priya S.', avatar: 'PS', text: "I had a breakthrough today! After 3 months, I finally touched my toes without bending my knees. Small wins matter! 🎉", time: '10:00 AM', isMe: false },
     { id: 's5', sender: 'Alex M.', avatar: 'AM', text: "That's amazing, Priya! Celebrating with you. This group has been such a source of motivation for me.", time: '10:05 AM', isMe: false },
     { id: 's6', sender: 'Support Group', avatar: 'SG', text: "Remember: You're not alone in this journey. We're all here to support each other. If you're having a tough day, reach out - someone is always here to listen. ❤️", time: '11:00 AM', isMe: false },
-  ],
-  'batch001': [
-    { id: 'b1', sender: 'Pawan (Instructor)', avatar: 'PN', text: "Welcome to Batch 001! 🎉 I'm excited to guide you through this 6-month transformation journey. Let's start by introducing ourselves - share your name and what brought you to yoga!", time: '10:00 AM', isMe: false },
-    { id: 'b2', sender: 'Alex M.', avatar: 'AM', text: "Hi everyone! I'm Alex. I've been dealing with back pain from desk work and heard yoga can help. Excited to be part of this batch!", time: '10:15 AM', isMe: false },
-    { id: 'b3', sender: 'Priya S.', avatar: 'PS', text: "Hello Batch 001! I'm Priya. Looking forward to improving my flexibility and finding some peace in my busy schedule. Let's do this together! 🙏", time: '10:20 AM', isMe: false },
-    { id: 'b4', sender: 'David K.', avatar: 'DK', text: "Quick question - what should we prepare for the first class this Saturday?", time: '10:30 AM', isMe: false },
-    { id: 'b5', sender: 'Pawan (Instructor)', avatar: 'PN', text: "Great question, David! Just bring yourself, comfortable clothes, and a yoga mat if you have one. We'll provide everything else you need. See you all on Saturday! 🌟", time: '10:35 AM', isMe: false },
   ],
   '2': [
     { id: 'g1', sender: 'Beginner\'s Circle', avatar: 'BC', text: "Hey everyone, which mat are you all using? I'm looking to upgrade.", time: '1:00 PM', isMe: false },
