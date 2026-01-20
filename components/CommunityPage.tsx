@@ -28,11 +28,7 @@ interface Conversation {
 const INITIAL_CONVERSATIONS: Conversation[] = [
   { id: 'support', author: 'Support Group', avatar: 'SG', lastText: 'Remember: You\'re not alone in this journey...', time: 'Just now', unreadCount: 3, isGroup: true, isSupportGroup: true, members: 24 },
   { id: 'batch001', author: 'Batch 001', avatar: 'B1', lastText: 'Welcome to Batch 001! Let\'s start our journey together...', time: '30m', unreadCount: 5, isGroup: true, members: 18 },
-  { id: '1', author: 'Sarah Johnson', avatar: 'SJ', lastText: 'Of course! What would you like...', time: '1h', unreadCount: 1 },
   { id: '2', author: "Beginner's Circle", avatar: 'BC', lastText: 'I use the Manduka PROlite and...', time: '1h', unreadCount: 2, isGroup: true, members: 5 },
-  { id: '3', author: 'Raj Patel', avatar: 'RP', lastText: "Keep practicing and you'll mast...", time: '2h' },
-  { id: '4', author: 'Meditation & Mindfuln...', avatar: 'MM', lastText: 'I find guided meditations really...', time: '2h', unreadCount: 1, isGroup: true, members: 6 },
-  { id: '5', author: 'Aradhna (Instructor)', avatar: 'AU', lastText: 'Great form today, everyone!', time: '4h' },
   { id: '6', author: 'Morning Flow Group', avatar: 'MF', lastText: 'Who is joining the 6:30 AM class?', time: '5h', isGroup: true, members: 12 },
 ];
 
@@ -41,23 +37,16 @@ const INITIAL_HISTORIES: Record<string, ChatMessage[]> = {
     { id: 's1', sender: 'Pawan (Instructor)', avatar: 'PN', text: "Welcome to the Support Group! This is a safe space for sharing challenges, victories, and everything in between. Remember: progress isn't linear, and every small step counts. 🙏", time: '9:00 AM', isMe: false },
     { id: 's2', sender: 'Elena D.', avatar: 'ED', text: "Thank you for creating this space. I've been struggling with consistency this week. Any tips?", time: '9:15 AM', isMe: false },
     { id: 's3', sender: 'Michael T.', avatar: 'MT', text: "Elena, I found that setting a specific time each day helps. Even if it's just 10 minutes, consistency beats intensity. You've got this! 💪", time: '9:20 AM', isMe: false },
-    { id: 's4', sender: 'Aradhna (Instructor)', avatar: 'AU', text: "Beautiful advice, Michael! Also, remember that rest days are part of the practice. Listen to your body - it's your best teacher.", time: '9:25 AM', isMe: false },
-    { id: 's5', sender: 'Sarah J.', avatar: 'SJ', text: "I had a breakthrough today! After 3 months, I finally touched my toes without bending my knees. Small wins matter! 🎉", time: '10:00 AM', isMe: false },
-    { id: 's6', sender: 'Raj P.', avatar: 'RP', text: "That's amazing, Sarah! Celebrating with you. This group has been such a source of motivation for me.", time: '10:05 AM', isMe: false },
-    { id: 's7', sender: 'Support Group', avatar: 'SG', text: "Remember: You're not alone in this journey. We're all here to support each other. If you're having a tough day, reach out - someone is always here to listen. ❤️", time: '11:00 AM', isMe: false },
+    { id: 's4', sender: 'Priya S.', avatar: 'PS', text: "I had a breakthrough today! After 3 months, I finally touched my toes without bending my knees. Small wins matter! 🎉", time: '10:00 AM', isMe: false },
+    { id: 's5', sender: 'Alex M.', avatar: 'AM', text: "That's amazing, Priya! Celebrating with you. This group has been such a source of motivation for me.", time: '10:05 AM', isMe: false },
+    { id: 's6', sender: 'Support Group', avatar: 'SG', text: "Remember: You're not alone in this journey. We're all here to support each other. If you're having a tough day, reach out - someone is always here to listen. ❤️", time: '11:00 AM', isMe: false },
   ],
   'batch001': [
     { id: 'b1', sender: 'Pawan (Instructor)', avatar: 'PN', text: "Welcome to Batch 001! 🎉 I'm excited to guide you through this 6-month transformation journey. Let's start by introducing ourselves - share your name and what brought you to yoga!", time: '10:00 AM', isMe: false },
     { id: 'b2', sender: 'Alex M.', avatar: 'AM', text: "Hi everyone! I'm Alex. I've been dealing with back pain from desk work and heard yoga can help. Excited to be part of this batch!", time: '10:15 AM', isMe: false },
     { id: 'b3', sender: 'Priya S.', avatar: 'PS', text: "Hello Batch 001! I'm Priya. Looking forward to improving my flexibility and finding some peace in my busy schedule. Let's do this together! 🙏", time: '10:20 AM', isMe: false },
-    { id: 'b4', sender: 'Aradhna (Instructor)', avatar: 'AU', text: "Wonderful to see everyone introducing themselves! Remember, we're all starting this journey together. No question is too small - feel free to ask anything.", time: '10:25 AM', isMe: false },
-    { id: 'b5', sender: 'David K.', avatar: 'DK', text: "Quick question - what should we prepare for the first class this Saturday?", time: '10:30 AM', isMe: false },
-    { id: 'b6', sender: 'Pawan (Instructor)', avatar: 'PN', text: "Great question, David! Just bring yourself, comfortable clothes, and a yoga mat if you have one. We'll provide everything else you need. See you all on Saturday! 🌟", time: '10:35 AM', isMe: false },
-  ],
-  '1': [
-    { id: 'm1', sender: 'Sarah Johnson', avatar: 'SJ', text: "Hi! I was wondering if you recommend any specific props for the evening Nidra?", time: '12:30 PM', isMe: false },
-    { id: 'm2', sender: 'Me', avatar: 'ME', text: "Definitely a bolster and a light eye mask. It makes a huge difference!", time: '12:35 PM', isMe: true },
-    { id: 'm3', sender: 'Sarah Johnson', avatar: 'SJ', text: "Of course! What would you like to know about the eye masks?", time: '1:10 PM', isMe: false },
+    { id: 'b4', sender: 'David K.', avatar: 'DK', text: "Quick question - what should we prepare for the first class this Saturday?", time: '10:30 AM', isMe: false },
+    { id: 'b5', sender: 'Pawan (Instructor)', avatar: 'PN', text: "Great question, David! Just bring yourself, comfortable clothes, and a yoga mat if you have one. We'll provide everything else you need. See you all on Saturday! 🌟", time: '10:35 AM', isMe: false },
   ],
   '2': [
     { id: 'g1', sender: 'Beginner\'s Circle', avatar: 'BC', text: "Hey everyone, which mat are you all using? I'm looking to upgrade.", time: '1:00 PM', isMe: false },

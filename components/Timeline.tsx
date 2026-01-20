@@ -155,7 +155,7 @@ export const Timeline: React.FC<TimelineProps> = ({ onNavPricing }) => {
 
   return (
     <>
-      <section className="bg-white pt-24 md:pt-32 pb-12 md:pb-16 px-6 overflow-hidden">
+      <section id="path-to-transformation" className="bg-white pt-24 md:pt-32 pb-12 md:pb-16 px-6 overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <SectionHeading 
             title="The Path to Transformation" 

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Reveal } from './Reveal';
 import { Button } from './Button';
-import { Mail, MessageSquare, MapPin, Send, CheckCircle2, Phone, AlertCircle } from 'lucide-react';
+import { Mail, MessageSquare, MapPin, Send, CheckCircle2, AlertCircle } from 'lucide-react';
 import { saveContactMessage } from '../utils/contactForm';
 
 export const Contact: React.FC = () => {
@@ -111,19 +111,6 @@ export const Contact: React.FC = () => {
               </Reveal>
 
               <Reveal delay={0.2}>
-                <div className="flex gap-6 items-start group">
-                  <div className="p-4 bg-teal-50 rounded-2xl text-teal-600 group-hover:bg-teal-600 group-hover:text-white transition-all duration-500 shadow-sm">
-                    <Phone size={24} />
-                  </div>
-                  {/* <div>
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">WhatsApp Support</h4>
-                    <p className="text-lg font-medium text-slate-900">+91 844 577 2880</p>
-                    <p className="text-sm text-slate-500">Available 9AM - 6PM IST</p>
-                  </div> */}
-                </div>
-              </Reveal>
-
-              <Reveal delay={0.3}>
                 <div className="flex gap-6 items-start group">
                   <div className="p-4 bg-teal-50 rounded-2xl text-teal-600 group-hover:bg-teal-600 group-hover:text-white transition-all duration-500 shadow-sm">
                     <MapPin size={24} />

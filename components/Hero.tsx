@@ -39,10 +39,10 @@ export const Hero: React.FC<HeroProps> = ({ onNavPricing }) => {
   };
 
   const handleSeeJourney = () => {
-    // Scroll to the "Path to Transformation" section on the landing page
-    const journeySection = document.getElementById('journey');
-    if (journeySection) {
-      journeySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Scroll to the "Path to Transformation" section (Timeline) on the landing page
+    const pathToTransformationSection = document.getElementById('path-to-transformation');
+    if (pathToTransformationSection) {
+      pathToTransformationSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
