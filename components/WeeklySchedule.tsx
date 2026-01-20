@@ -5,7 +5,11 @@ import { WEEKLY_SCHEDULE } from '../constants';
 import { Clock, Signal, ExternalLink } from 'lucide-react';
 import { Reveal } from './Reveal';
 
-export const WeeklySchedule: React.FC = () => {
+interface WeeklyScheduleProps {
+  onViewSampleClass?: () => void;
+}
+
+export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ onViewSampleClass }) => {
   return (
     <section id="schedule" className="bg-white pt-12 md:pt-16 pb-16 md:pb-24 px-6">
       <div className="max-w-7xl mx-auto">
@@ -55,7 +59,10 @@ export const WeeklySchedule: React.FC = () => {
                   <h4 className="text-2xl md:text-3xl font-serif font-bold mb-3">Missed the live flow?</h4>
                   <p className="text-slate-400 max-w-md">Every class is instantly archived in your private library for 7 days of on-demand practice.</p>
               </div>
-              <button className="relative z-10 shrink-0 bg-white hover:bg-teal-50 text-slate-900 px-8 py-4 rounded-full font-bold text-sm tracking-widest uppercase transition-all shadow-xl hover:scale-105 active:scale-95">
+              <button 
+                onClick={onViewSampleClass}
+                className="relative z-10 shrink-0 bg-white hover:bg-teal-50 text-slate-900 px-8 py-4 rounded-full font-bold text-sm tracking-widest uppercase transition-all shadow-xl hover:scale-105 active:scale-95"
+              >
                   View Sample Class
               </button>
           </div>

@@ -305,7 +305,7 @@ export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
                onClick={handleJoinWorkshop}
                className="bg-teal-600 text-white px-10 py-5 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-teal-500 transition-all shadow-2xl relative z-10"
              >
-                Join Live Workshop
+                Join Live Classes
              </button>
           </div>
         </Reveal>

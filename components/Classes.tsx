@@ -1,16 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Reveal } from './Reveal';
 import { Button } from './Button';
 import { LIVE_CLASSES, RECORDED_CLASSES } from '../constants';
 import { Clock, Play, ExternalLink, Filter, ChevronDown, Calendar, Search, X, Sparkles } from 'lucide-react';
 import { YogaClass } from '../types';
 
-export const Classes: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'live' | 'recorded'>('live');
+interface ClassesProps {
+  initialTab?: 'live' | 'recorded';
+}
+
+export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live' }) => {
+  const [activeTab, setActiveTab] = useState<'live' | 'recorded'>(initialTab);
   const [filterType, setFilterType] = useState<string>('All Types');
   const [filterLevel, setFilterLevel] = useState<string>('All Levels');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+
+  // Update activeTab when initialTab prop changes
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const types = ['All Types', 'Hatha', 'Vinyasa', 'Meditation', 'Mobility'];
   const levels = ['All Levels', 'Beginner', 'Intermediate', 'All'];

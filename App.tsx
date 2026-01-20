@@ -25,6 +25,7 @@ import { TermsConditions } from './components/TermsConditions';
 const AppContent: React.FC = () => {
   const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms'>('home');
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
+  const [classesInitialTab, setClassesInitialTab] = useState<'live' | 'recorded'>('live');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -41,7 +42,14 @@ const AppContent: React.FC = () => {
   };
 
   const handleNavClasses = () => {
+    setClassesInitialTab('live');
     setView('classes');
+  };
+
+  const handleViewSampleClass = () => {
+    setClassesInitialTab('recorded');
+    setView('classes');
+    window.scrollTo(0, 0);
   };
 
   const handleNavAbout = () => {
@@ -120,7 +128,7 @@ const AppContent: React.FC = () => {
               <Timeline />
             </div>
 
-            <WeeklySchedule />
+            <WeeklySchedule onViewSampleClass={handleViewSampleClass} />
             
             <Instructors onViewProfile={handleViewProfile} />
             
@@ -154,7 +162,7 @@ const AppContent: React.FC = () => {
           <FullInstructors onBack={handleNavHome} selectedId={selectedInstructorId} />
         )}
 
-        {view === 'classes' && <Classes />}
+        {view === 'classes' && <Classes initialTab={classesInitialTab} />}
         {view === 'about' && <About onContactClick={handleContactClick} />}
         {view === 'pricing' && <Pricing />}
         {view === 'community' && <CommunityPage />}
