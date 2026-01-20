@@ -52,6 +52,12 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
 
   const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    // Prevent multiple submissions
+    if (isSubmitting) {
+      return;
+    }
     
     // Validate email
     if (!newsletterEmail || !newsletterEmail.trim() || !newsletterEmail.includes('@')) {
@@ -75,11 +81,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
 
       setSubmitStatus('success');
       setNewsletterEmail('');
-      setIsSubmitting(false);
       
-      // Reset success message after 3 seconds
+      // Reset success message and submitting state after 3 seconds
       setTimeout(() => {
         setSubmitStatus('idle');
+        setIsSubmitting(false);
       }, 3000);
     } catch (error: any) {
       console.error('Error saving newsletter subscription:', error);
@@ -157,11 +163,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className={`absolute right-2 top-2 bottom-2 px-6 rounded-full font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg ${
+                className={`absolute right-2 top-2 bottom-2 px-6 rounded-full font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg z-10 ${
                   submitStatus === 'success'
                     ? 'bg-green-600 text-white hover:bg-green-700'
                     : 'bg-teal-600 text-white hover:bg-teal-700'
-                } ${isSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                } ${isSubmitting ? 'opacity-60 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:scale-105 active:scale-95'}`}
               >
                 {isSubmitting ? (
                   'Joining...'
