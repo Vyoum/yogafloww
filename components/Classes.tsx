@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Reveal } from './Reveal';
 import { Button } from './Button';
 import { LIVE_CLASSES, RECORDED_CLASSES } from '../constants';
-import { Clock, Play, ExternalLink, Filter, ChevronDown, Calendar, Search, X } from 'lucide-react';
+import { Clock, Play, ExternalLink, Filter, ChevronDown, Calendar, Search, X, Sparkles } from 'lucide-react';
 import { YogaClass } from '../types';
 
 export const Classes: React.FC = () => {
@@ -57,8 +57,12 @@ export const Classes: React.FC = () => {
         </div>
       </section>
 
-      {/* 2. NAVIGATION & SEARCH BAR */}
-      <div className="sticky top-[64px] md:top-[72px] z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 md:px-6">
+      {/* COMING SOON OVERLAY - Remove this section when ready to show classes */}
+      <div className="relative min-h-[600px]">
+        {/* Blurred Background Content */}
+        <div className="blur-sm pointer-events-none select-none">
+          {/* 2. NAVIGATION & SEARCH BAR */}
+          <div className="sticky top-[64px] md:top-[72px] z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 md:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between py-3 md:py-4 gap-4">
             {/* Tabs */}
@@ -127,120 +131,140 @@ export const Classes: React.FC = () => {
         </div>
       </section>
 
-      {/* 4. CONTENT AREA */}
-      <section className="px-4 md:px-6 py-8 md:py-12 pb-24">
-        <div className="max-w-7xl mx-auto">
-          {filteredClasses.length > 0 ? (
-            activeTab === 'live' ? (
-              <div className="space-y-4 md:space-y-6">
-                {filteredClasses.map((cls, idx) => (
-                  <Reveal key={cls.id} delay={idx * 0.05}>
-                    <div className="group relative bg-white hover:bg-slate-50/50 rounded-2xl md:rounded-[2rem] p-5 md:p-10 border border-slate-100 transition-all duration-700 flex flex-col md:flex-row md:items-center gap-4 md:gap-8 overflow-hidden shadow-sm hover:shadow-md">
-                      {/* Interaction Background Glow */}
-                      <div className="absolute -inset-1 bg-gradient-to-r from-teal-500 to-teal-200 opacity-0 group-hover:opacity-10 transition-opacity blur-2xl pointer-events-none"></div>
-                      
-                      {/* Time Indicator */}
-                      <div className="md:w-32 shrink-0 border-b md:border-b-0 md:border-r border-slate-100 pb-3 md:pb-0 md:pr-8">
-                        <p className="text-2xl md:text-4xl font-serif font-bold text-slate-900 group-hover:text-teal-600 transition-colors">
-                          {cls.time?.split(' ')[0]}
-                          <span className="text-xs uppercase ml-1 opacity-40">{cls.time?.split(' ')[1]}</span>
-                        </p>
-                        <span className="text-[9px] uppercase font-bold tracking-[0.1em] text-slate-400">Local Time (IST)</span>
-                      </div>
+          {/* 4. CONTENT AREA */}
+          <section className="px-4 md:px-6 py-8 md:py-12 pb-24">
+            <div className="max-w-7xl mx-auto">
+              {filteredClasses.length > 0 ? (
+                activeTab === 'live' ? (
+                  <div className="space-y-4 md:space-y-6">
+                    {filteredClasses.map((cls, idx) => (
+                      <Reveal key={cls.id} delay={idx * 0.05}>
+                        <div className="group relative bg-white hover:bg-slate-50/50 rounded-2xl md:rounded-[2rem] p-5 md:p-10 border border-slate-100 transition-all duration-700 flex flex-col md:flex-row md:items-center gap-4 md:gap-8 overflow-hidden shadow-sm hover:shadow-md">
+                          {/* Interaction Background Glow */}
+                          <div className="absolute -inset-1 bg-gradient-to-r from-teal-500 to-teal-200 opacity-0 group-hover:opacity-10 transition-opacity blur-2xl pointer-events-none"></div>
+                          
+                          {/* Time Indicator */}
+                          <div className="md:w-32 shrink-0 border-b md:border-b-0 md:border-r border-slate-100 pb-3 md:pb-0 md:pr-8">
+                            <p className="text-2xl md:text-4xl font-serif font-bold text-slate-900 group-hover:text-teal-600 transition-colors">
+                              {cls.time?.split(' ')[0]}
+                              <span className="text-xs uppercase ml-1 opacity-40">{cls.time?.split(' ')[1]}</span>
+                            </p>
+                            <span className="text-[9px] uppercase font-bold tracking-[0.1em] text-slate-400">Local Time (IST)</span>
+                          </div>
 
-                      {/* Class Info */}
-                      <div className="flex-1 space-y-2">
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <span className="text-teal-600 text-[9px] md:text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-teal-50 rounded">
-                            {cls.type}
-                          </span>
-                          <span className="w-1 h-1 rounded-full bg-slate-200"></span>
-                          <span className="text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest">
-                            {cls.duration}
-                          </span>
-                        </div>
-                        <h3 className="text-lg md:text-3xl font-serif font-bold text-slate-900 leading-tight">
-                          {cls.title}
-                        </h3>
-                        <div className="flex flex-wrap gap-3">
-                          {cls.focus.map(f => (
-                            <span key={f} className="text-[10px] md:text-[11px] text-slate-500 font-light italic">#{f.toLowerCase()}</span>
-                          ))}
-                        </div>
-                      </div>
+                          {/* Class Info */}
+                          <div className="flex-1 space-y-2">
+                            <div className="flex flex-wrap gap-2 items-center">
+                              <span className="text-teal-600 text-[9px] md:text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-teal-50 rounded">
+                                {cls.type}
+                              </span>
+                              <span className="w-1 h-1 rounded-full bg-slate-200"></span>
+                              <span className="text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest">
+                                {cls.duration}
+                              </span>
+                            </div>
+                            <h3 className="text-lg md:text-3xl font-serif font-bold text-slate-900 leading-tight">
+                              {cls.title}
+                            </h3>
+                            <div className="flex flex-wrap gap-3">
+                              {cls.focus.map(f => (
+                                <span key={f} className="text-[10px] md:text-[11px] text-slate-500 font-light italic">#{f.toLowerCase()}</span>
+                              ))}
+                            </div>
+                          </div>
 
-                      {/* Instructor Profile */}
-                      <div className="flex items-center gap-4 md:px-8 md:border-l md:border-slate-100 pt-2 md:pt-0">
-                        <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-slate-900 flex items-center justify-center text-white text-[10px] md:text-xs font-bold font-serif shadow-lg group-hover:bg-teal-600 transition-colors shrink-0">
-                          {cls.instructor.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Instructor</p>
-                          <p className="text-xs md:text-sm font-medium text-slate-800">{cls.instructor}</p>
-                        </div>
-                      </div>
+                          {/* Instructor Profile */}
+                          <div className="flex items-center gap-4 md:px-8 md:border-l md:border-slate-100 pt-2 md:pt-0">
+                            <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-slate-900 flex items-center justify-center text-white text-[10px] md:text-xs font-bold font-serif shadow-lg group-hover:bg-teal-600 transition-colors shrink-0">
+                              {cls.instructor.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Instructor</p>
+                              <p className="text-xs md:text-sm font-medium text-slate-800">{cls.instructor}</p>
+                            </div>
+                          </div>
 
-                      {/* Action */}
-                      <div className="md:w-48 text-right pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
-                        <button className="w-full md:w-auto inline-flex items-center justify-center gap-3 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] text-teal-600 hover:text-teal-800 group-hover:translate-x-1 transition-all py-1 md:py-0">
-                          Enter Studio <ExternalLink size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </Reveal>
-                ))}
-              </div>
-            ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-10 gap-y-12">
-                {filteredClasses.map((cls, idx) => (
-                  <Reveal key={cls.id} delay={idx * 0.1}>
-                    <div className="group relative flex flex-col">
-                      <div className="relative aspect-[16/10] bg-slate-50 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden mb-5 md:mb-8 border border-slate-50 shadow-sm hover:shadow-xl transition-all duration-700">
-                        <div className="absolute inset-0 bg-gradient-to-tr from-teal-600/5 to-transparent"></div>
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-white/20 backdrop-blur-sm">
-                           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-white flex items-center justify-center text-teal-600 shadow-2xl scale-75 group-hover:scale-100 transition-transform duration-500">
-                             <Play fill="currentColor" size={24} />
-                           </div>
+                          {/* Action */}
+                          <div className="md:w-48 text-right pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
+                            <button className="w-full md:w-auto inline-flex items-center justify-center gap-3 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] text-teal-600 hover:text-teal-800 group-hover:translate-x-1 transition-all py-1 md:py-0">
+                              Enter Studio <ExternalLink size={14} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="absolute top-4 left-4 flex gap-2">
-                           <span className="px-2 py-1 bg-white/90 backdrop-blur-md rounded-full text-[8px] font-bold uppercase tracking-widest text-slate-700 shadow-sm border border-white/50">
-                             {cls.type}
-                           </span>
-                        </div>
-                        <div className="absolute bottom-4 left-4">
-                           <span className="text-[9px] font-bold uppercase tracking-widest text-slate-700/60 md:text-white/80 drop-shadow-sm md:drop-shadow-md">
-                             {cls.duration} • {cls.level}
-                           </span>
-                        </div>
-                      </div>
+                      </Reveal>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 md:gap-x-10 gap-y-12">
+                    {filteredClasses.map((cls, idx) => (
+                      <Reveal key={cls.id} delay={idx * 0.1}>
+                        <div className="group relative flex flex-col">
+                          <div className="relative aspect-[16/10] bg-slate-50 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden mb-5 md:mb-8 border border-slate-50 shadow-sm hover:shadow-xl transition-all duration-700">
+                            <div className="absolute inset-0 bg-gradient-to-tr from-teal-600/5 to-transparent"></div>
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-white/20 backdrop-blur-sm">
+                               <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-white flex items-center justify-center text-teal-600 shadow-2xl scale-75 group-hover:scale-100 transition-transform duration-500">
+                                 <Play fill="currentColor" size={24} />
+                               </div>
+                            </div>
+                            <div className="absolute top-4 left-4 flex gap-2">
+                               <span className="px-2 py-1 bg-white/90 backdrop-blur-md rounded-full text-[8px] font-bold uppercase tracking-widest text-slate-700 shadow-sm border border-white/50">
+                                 {cls.type}
+                               </span>
+                            </div>
+                            <div className="absolute bottom-4 left-4">
+                               <span className="text-[9px] font-bold uppercase tracking-widest text-slate-700/60 md:text-white/80 drop-shadow-sm md:drop-shadow-md">
+                                 {cls.duration} • {cls.level}
+                               </span>
+                            </div>
+                          </div>
 
-                      <div className="px-2 space-y-2 md:space-y-3">
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Archive Session</p>
-                        <h3 className="text-xl md:text-3xl font-serif font-bold text-slate-900 group-hover:text-teal-600 transition-colors leading-tight">
-                          {cls.title}
-                        </h3>
-                        <p className="text-xs md:text-sm font-light text-slate-600">{cls.instructor}</p>
-                        <div className="pt-4 flex items-center justify-between border-t border-slate-50">
-                           <div className="flex gap-2">
-                             {cls.focus.slice(0, 2).map(f => (
-                               <span key={f} className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-tighter">#{f}</span>
-                             ))}
-                           </div>
-                           <button className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-teal-600 hover:translate-x-1 transition-transform">
-                             Watch Session
-                           </button>
+                          <div className="px-2 space-y-2 md:space-y-3">
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Archive Session</p>
+                            <h3 className="text-xl md:text-3xl font-serif font-bold text-slate-900 group-hover:text-teal-600 transition-colors leading-tight">
+                              {cls.title}
+                            </h3>
+                            <p className="text-xs md:text-sm font-light text-slate-600">{cls.instructor}</p>
+                            <div className="pt-4 flex items-center justify-between border-t border-slate-50">
+                               <div className="flex gap-2">
+                                 {cls.focus.slice(0, 2).map(f => (
+                                   <span key={f} className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-tighter">#{f}</span>
+                                 ))}
+                               </div>
+                               <button className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-teal-600 hover:translate-x-1 transition-transform">
+                                 Watch Session
+                               </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </Reveal>
-                ))}
-              </div>
-            )
-          ) : (
-            <EmptyState onReset={clearFilters} />
-          )}
+                      </Reveal>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <EmptyState onReset={clearFilters} />
+              )}
+            </div>
+          </section>
         </div>
-      </section>
+
+        {/* Coming Soon Overlay */}
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-md">
+          <Reveal>
+            <div className="text-center px-6 py-12 md:py-20">
+              <div className="inline-flex items-center justify-center w-20 h-20 md:w-24 md:h-24 rounded-full bg-teal-100 mb-6 md:mb-8 animate-pulse">
+                <Sparkles className="text-teal-600" size={40} />
+              </div>
+              <h2 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 mb-4 md:mb-6">
+                Coming <span className="text-teal-600 italic">Soon</span>
+              </h2>
+              <p className="text-lg md:text-xl text-slate-600 max-w-md mx-auto font-light leading-relaxed">
+                We're preparing something special for you. Classes will be available soon.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </div>
+      {/* END COMING SOON OVERLAY - Remove the above section when ready to show classes */}
 
       {/* 5. CTA SECTION - REFINED FOR VISIBILITY */}
       <section className="px-4 md:px-6 pb-20 md:pb-32">
