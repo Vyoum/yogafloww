@@ -148,7 +148,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             size="sm" 
             className={`rounded-full shadow-none hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-500 ${isScrolled ? 'px-5 py-2 text-[9px]' : 'px-7 py-3'}`}
           >
-            View Pricing
+            Start Free Month
           </Button>
           
           {/* Profile Icon */}
