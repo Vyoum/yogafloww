@@ -125,7 +125,7 @@ const AppContent: React.FC = () => {
             
             <div id="journey">
               <ProblemSolution />
-              <Timeline />
+              <Timeline onNavPricing={handleNavPricing} />
             </div>
 
             <WeeklySchedule onViewSampleClass={handleViewSampleClass} />

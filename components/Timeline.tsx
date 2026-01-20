@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { SectionHeading } from './SectionHeading';
 import { TIMELINE_STEPS } from '../constants';
 import { Quote, Check, ArrowDown } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { LoginModal, SignupModal } from './LoginModal';
 
 // Custom hook for intersection observer
 const useInView = (options = { threshold: 0.1, rootMargin: '-20px' }) => {
@@ -122,30 +124,84 @@ const TimelineCard: React.FC<{ step: any; index: number }> = ({ step, index }) =
   );
 };
 
-export const Timeline: React.FC = () => {
-  return (
-    <section className="bg-white pt-24 md:pt-32 pb-12 md:pb-16 px-6 overflow-hidden">
-      <div className="max-w-7xl mx-auto">
-        <SectionHeading 
-          title="The Path to Transformation" 
-          subtitle="6 months. 3 distinct phases. A lifetime of measurable change."
-        />
+interface TimelineProps {
+  onNavPricing: () => void;
+}
 
-        <div className="relative mt-16 md:mt-32 max-w-5xl mx-auto">
-           {TIMELINE_STEPS.map((step, idx) => (
-             <TimelineCard key={idx} step={step} index={idx} />
-           ))}
+export const Timeline: React.FC<TimelineProps> = ({ onNavPricing }) => {
+  const { isAuthenticated } = useAuth();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [shouldNavigateToPricing, setShouldNavigateToPricing] = useState(false);
+
+  const handleReadyToStart = () => {
+    if (!isAuthenticated) {
+      // Show login modal if user is not logged in
+      setShouldNavigateToPricing(true);
+      setIsLoginModalOpen(true);
+    } else {
+      // Navigate to pricing if user is logged in
+      onNavPricing();
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && shouldNavigateToPricing) {
+      // Navigate to pricing after successful login
+      onNavPricing();
+      setShouldNavigateToPricing(false);
+    }
+  }, [isAuthenticated, shouldNavigateToPricing, onNavPricing]);
+
+  return (
+    <>
+      <section className="bg-white pt-24 md:pt-32 pb-12 md:pb-16 px-6 overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <SectionHeading 
+            title="The Path to Transformation" 
+            subtitle="6 months. 3 distinct phases. A lifetime of measurable change."
+          />
+
+          <div className="relative mt-16 md:mt-32 max-w-5xl mx-auto">
+             {TIMELINE_STEPS.map((step, idx) => (
+               <TimelineCard key={idx} step={step} index={idx} />
+             ))}
+          </div>
+          
+          {/* Call to Action at bottom of timeline - Reduced margin for tighter rhythm */}
+          <div className="text-center mt-12 md:mt-16">
+              <button
+                onClick={handleReadyToStart}
+                className="p-10 bg-teal-50 rounded-[3rem] inline-block w-full max-w-2xl border border-teal-100 hover:bg-teal-100 hover:border-teal-200 transition-all duration-300 cursor-pointer group"
+              >
+                 <ArrowDown className="w-6 h-6 mx-auto text-teal-400 mb-6 animate-bounce group-hover:text-teal-600 transition-colors" />
+                 <h4 className="text-2xl md:text-3xl font-serif font-bold text-teal-900 mb-4 tracking-tight group-hover:text-teal-800 transition-colors">Ready to start Month 1?</h4>
+                 <p className="text-teal-700 font-light mb-0 text-lg group-hover:text-teal-800 transition-colors">Focus: Restoring your nervous system and sleep architecture.</p>
+              </button>
+          </div>
         </div>
-        
-        {/* Call to Action at bottom of timeline - Reduced margin for tighter rhythm */}
-        <div className="text-center mt-12 md:mt-16">
-            <div className="p-10 bg-teal-50 rounded-[3rem] inline-block w-full max-w-2xl border border-teal-100">
-               <ArrowDown className="w-6 h-6 mx-auto text-teal-400 mb-6 animate-bounce" />
-               <h4 className="text-2xl md:text-3xl font-serif font-bold text-teal-900 mb-4 tracking-tight">Ready to start Month 1?</h4>
-               <p className="text-teal-700 font-light mb-0 text-lg">Focus: Restoring your nervous system and sleep architecture.</p>
-            </div>
-        </div>
-      </div>
-    </section>
+      </section>
+
+      {/* Login and Signup Modals */}
+      {isLoginModalOpen && (
+        <LoginModal
+          onClose={() => setIsLoginModalOpen(false)}
+          onSwitchToSignup={() => {
+            setIsLoginModalOpen(false);
+            setIsSignupModalOpen(true);
+          }}
+        />
+      )}
+
+      {isSignupModalOpen && (
+        <SignupModal
+          onClose={() => setIsSignupModalOpen(false)}
+          onSwitchToLogin={() => {
+            setIsSignupModalOpen(false);
+            setIsLoginModalOpen(true);
+          }}
+        />
+      )}
+    </>
   );
 };

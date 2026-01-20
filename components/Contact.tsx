@@ -130,7 +130,7 @@ export const Contact: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Rishikesh HQ</h4>
-                    <p className="text-lg font-medium text-slate-900">Adishakti Yogashala</p>
+                    <p className="text-lg font-medium text-slate-900">Rishikesh</p>
                     <p className="text-sm text-slate-500">Laxman Jhula, Uttarakhand, India</p>
                   </div>
                 </div>
