@@ -16,17 +16,21 @@ export interface ContactFormData {
  */
 export const saveContactMessage = async (formData: ContactFormData): Promise<string> => {
   try {
-    const docRef = await addDoc(collection(db, "contactMessages"), {
-      ...formData,
+    const docRef = await addDoc(collection(db, "contact_form"), {
+      name: formData.name.trim(),
+      email: formData.email.toLowerCase().trim(),
+      inquiryType: formData.inquiryType,
+      message: formData.message.trim(),
       timestamp: serverTimestamp(),
       status: "new", // Can be: new, read, replied
       createdAt: new Date().toISOString(),
+      source: "website_contact_form"
     });
     
-    console.log("Contact message saved with ID: ", docRef.id);
+    console.log("Contact form submission saved with ID: ", docRef.id);
     return docRef.id;
   } catch (error) {
-    console.error("Error saving contact message: ", error);
+    console.error("Error saving contact form: ", error);
     throw error;
   }
 };
