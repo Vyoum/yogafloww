@@ -17,6 +17,12 @@ export const Contact: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent multiple submissions
+    if (formState === 'submitting') {
+      return;
+    }
+    
     setFormState('submitting');
     setErrorMessage('');
 

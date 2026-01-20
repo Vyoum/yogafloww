@@ -54,9 +54,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
     e.preventDefault();
     
     // Validate email
-    if (!newsletterEmail || !newsletterEmail.includes('@')) {
+    if (!newsletterEmail || !newsletterEmail.trim() || !newsletterEmail.includes('@')) {
       setSubmitStatus('error');
       setErrorMessage('Please enter a valid email address');
+      setIsSubmitting(false);
       return;
     }
 
@@ -74,6 +75,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
 
       setSubmitStatus('success');
       setNewsletterEmail('');
+      setIsSubmitting(false);
       
       // Reset success message after 3 seconds
       setTimeout(() => {
@@ -83,7 +85,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
       console.error('Error saving newsletter subscription:', error);
       setSubmitStatus('error');
       setErrorMessage('Something went wrong. Please try again.');
-    } finally {
       setIsSubmitting(false);
     }
   };
