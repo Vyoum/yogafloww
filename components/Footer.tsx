@@ -5,9 +5,13 @@ import {
   Compass,
   Clock,
   ArrowRight,
-  Smartphone
+  Smartphone,
+  Check,
+  X
 } from 'lucide-react';
 import { LOGO_URL } from '../constants';
+import { db } from '../config/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface FooterProps {
   onNavHome: () => void;
@@ -23,6 +27,10 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onNavClasses, onNavAbout, onNavPricing, onNavCommunity, onNavPrivacy, onNavTerms, isHomePage }) => {
   const [indiaTime, setIndiaTime] = useState<string>('');
+  const [newsletterEmail, setNewsletterEmail] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
     const updateTime = () => {
@@ -41,6 +49,44 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
     const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate email
+    if (!newsletterEmail || !newsletterEmail.includes('@')) {
+      setSubmitStatus('error');
+      setErrorMessage('Please enter a valid email address');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitStatus('idle');
+    setErrorMessage('');
+
+    try {
+      // Save email to Firestore
+      await addDoc(collection(db, 'newsletter_subscribers'), {
+        email: newsletterEmail.toLowerCase().trim(),
+        subscribedAt: serverTimestamp(),
+        source: 'website_footer'
+      });
+
+      setSubmitStatus('success');
+      setNewsletterEmail('');
+      
+      // Reset success message after 3 seconds
+      setTimeout(() => {
+        setSubmitStatus('idle');
+      }, 3000);
+    } catch (error: any) {
+      console.error('Error saving newsletter subscription:', error);
+      setSubmitStatus('error');
+      setErrorMessage('Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const navLinks = [
     { name: 'The Journey', href: '#journey', action: isHomePage ? null : onNavHome },
@@ -91,16 +137,55 @@ export const Footer: React.FC<FooterProps> = ({ onNavHome, onNavInstructors, onN
           <div className="w-full max-w-2xl bg-teal-50 border border-teal-100 rounded-[2.5rem] p-8 md:p-12 mb-20">
             <h3 className="text-[10px] font-bold uppercase tracking-[0.4em] text-teal-600 mb-4">The Practice Insider</h3>
             <p className="text-slate-900 text-xl md:text-2xl font-serif mb-8">Insights on breath, sleep, and longevity.</p>
-            <div className="relative max-w-md mx-auto">
+            <form onSubmit={handleNewsletterSubmit} className="relative max-w-md mx-auto">
               <input 
                 type="email" 
                 placeholder="email@address.com" 
-                className="w-full bg-white border border-teal-100 rounded-full py-4 px-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all text-sm"
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
+                disabled={isSubmitting}
+                className={`w-full bg-white border rounded-full py-4 px-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all text-sm ${
+                  submitStatus === 'error' 
+                    ? 'border-red-300 focus:ring-red-500' 
+                    : submitStatus === 'success'
+                    ? 'border-teal-300 focus:ring-teal-500'
+                    : 'border-teal-100 focus:ring-teal-500'
+                } ${isSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                required
               />
-              <button className="absolute right-2 top-2 bottom-2 bg-teal-600 text-white px-6 rounded-full font-bold text-[10px] uppercase tracking-widest hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-lg">
-                Join <ArrowRight size={14} />
+              <button 
+                type="submit"
+                disabled={isSubmitting}
+                className={`absolute right-2 top-2 bottom-2 px-6 rounded-full font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg ${
+                  submitStatus === 'success'
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-teal-600 text-white hover:bg-teal-700'
+                } ${isSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+              >
+                {isSubmitting ? (
+                  'Joining...'
+                ) : submitStatus === 'success' ? (
+                  <>
+                    <Check size={14} /> Joined
+                  </>
+                ) : (
+                  <>
+                    Join <ArrowRight size={14} />
+                  </>
+                )}
               </button>
-            </div>
+              {submitStatus === 'success' && (
+                <p className="mt-3 text-sm text-green-600 text-center font-medium">
+                  Thank you! You've been subscribed.
+                </p>
+              )}
+              {submitStatus === 'error' && (
+                <p className="mt-3 text-sm text-red-600 text-center font-medium flex items-center justify-center gap-2">
+                  <X size={14} />
+                  {errorMessage}
+                </p>
+              )}
+            </form>
           </div>
 
           {/* Download App Section */}

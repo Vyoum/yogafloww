@@ -460,7 +460,7 @@ export const PRICING_TIERS_USD: PricingTier[] = [
   },
   {
     name: 'Full Course (6 Months)',
-    price: '$249',
+    price: '$219',
     frequency: 'one-time',
     features: [
       'Everything in Monthly',

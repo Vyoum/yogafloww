@@ -39,13 +39,10 @@ export const Hero: React.FC<HeroProps> = ({ onNavPricing }) => {
   };
 
   const handleSeeJourney = () => {
-    if (!isAuthenticated) {
-      // Show login modal if user is not logged in
-      setShouldNavigateToPricing(true);
-      setIsLoginModalOpen(true);
-    } else {
-      // Navigate to pricing page if user is logged in
-      onNavPricing();
+    // Scroll to the "Path to Transformation" section on the landing page
+    const journeySection = document.getElementById('journey');
+    if (journeySection) {
+      journeySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
