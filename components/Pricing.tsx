@@ -177,7 +177,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                ₹ INR
+                ₹ INDIAN
               </button>
               <button
                 onClick={() => setIsIndia(false)}
@@ -187,7 +187,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                $ USD
+                $ GLOBAL
               </button>
               <Globe className="text-slate-400" size={18} />
             </div>
