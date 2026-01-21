@@ -1,15 +1,19 @@
 import React, { useRef, useEffect } from 'react';
-import { User, LogOut, Settings, Calendar, CreditCard } from 'lucide-react';
+import { User, LogOut, Settings, Calendar, CreditCard, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ProfileDropdownProps {
   isOpen: boolean;
   onClose: () => void;
+  onNavAdmin?: () => void;
 }
 
-export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose }) => {
+const ADMIN_EMAILS = ['admin@yogaflow.com', 'support@yogaflow.com'];
+
+export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose, onNavAdmin }) => {
   const { user, logout } = useAuth();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -110,6 +114,20 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClos
           <Settings size={18} className="text-teal-600" />
           <span className="font-medium">Settings</span>
         </a>
+        {isAdmin && onNavAdmin && (
+          <a
+            href="#"
+            className="flex items-center gap-3 px-6 py-3 text-slate-700 hover:bg-teal-50 transition-colors border-t border-slate-100 mt-2 pt-2"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavAdmin();
+              onClose();
+            }}
+          >
+            <Shield size={18} className="text-teal-600" />
+            <span className="font-medium">Admin Dashboard</span>
+          </a>
+        )}
       </div>
 
       {/* Logout */}

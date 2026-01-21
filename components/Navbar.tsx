@@ -17,6 +17,7 @@ interface NavbarProps {
   onNavMeditation?: () => void;
   onNavAsanas?: () => void;
   onNavResearch?: () => void;
+  onNavAdmin?: () => void;
   isHomePage: boolean;
 }
 
@@ -30,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavMeditation,
   onNavAsanas,
   onNavResearch,
+  onNavAdmin,
   isHomePage 
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -184,6 +186,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <ProfileDropdown
                 isOpen={isProfileDropdownOpen}
                 onClose={() => setIsProfileDropdownOpen(false)}
+                onNavAdmin={onNavAdmin}
               />
             )}
           </div>

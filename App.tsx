@@ -21,9 +21,10 @@ import { CustomCursor } from './components/CustomCursor';
 import { AuthProvider } from './contexts/AuthContext';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsConditions } from './components/TermsConditions';
+import { AdminDashboard } from './components/AdminDashboard';
 
 const AppContent: React.FC = () => {
-  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms'>('home');
+  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms' | 'admin'>('home');
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
   const [classesInitialTab, setClassesInitialTab] = useState<'live' | 'recorded'>('live');
 
@@ -92,6 +93,11 @@ const AppContent: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
+  const handleNavAdmin = () => {
+    setView('admin');
+    window.scrollTo(0, 0);
+  };
+
   const handleContactClick = () => {
     setView('home');
     setTimeout(() => {
@@ -102,21 +108,41 @@ const AppContent: React.FC = () => {
     }, 100);
   };
 
+  // Check URL for /admin route on mount
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path === '/admin' || path === '/admin/') {
+      setView('admin');
+    }
+  }, []);
+
+  // Update URL when view changes
+  useEffect(() => {
+    if (view === 'admin') {
+      window.history.pushState({}, '', '/admin');
+    } else if (view === 'home' && window.location.pathname === '/admin') {
+      window.history.pushState({}, '', '/');
+    }
+  }, [view]);
+
   return (
     <div className="min-h-screen bg-white text-slate-900 selection:bg-teal-100 selection:text-teal-900 antialiased">
-      <CustomCursor />
-      <Navbar 
-        onNavHome={handleNavHome} 
-        onNavInstructors={handleNavInstructors}
-        onNavClasses={handleNavClasses}
-        onNavAbout={handleNavAbout}
-        onNavPricing={handleNavPricing}
-        onNavCommunity={handleNavCommunity}
-        onNavMeditation={handleNavMeditation}
-        onNavAsanas={handleNavAsanas}
-        onNavResearch={handleNavResearch}
-        isHomePage={view === 'home'}
-      />
+      {view !== 'admin' && <CustomCursor />}
+      {view !== 'admin' && (
+        <Navbar 
+          onNavHome={handleNavHome} 
+          onNavInstructors={handleNavInstructors}
+          onNavClasses={handleNavClasses}
+          onNavAbout={handleNavAbout}
+          onNavPricing={handleNavPricing}
+          onNavCommunity={handleNavCommunity}
+          onNavMeditation={handleNavMeditation}
+          onNavAsanas={handleNavAsanas}
+          onNavResearch={handleNavResearch}
+          onNavAdmin={handleNavAdmin}
+          isHomePage={view === 'home'}
+        />
+      )}
       
       <main>
         {view === 'home' && (
@@ -171,9 +197,11 @@ const AppContent: React.FC = () => {
         {view === 'research' && <Research />}
         {view === 'privacy' && <PrivacyPolicy onBack={handleNavHome} />}
         {view === 'terms' && <TermsConditions onBack={handleNavHome} />}
+        {view === 'admin' && <AdminDashboard onBack={handleNavHome} />}
       </main>
       
-      <Footer 
+      {view !== 'admin' && (
+        <Footer 
         onNavHome={handleNavHome} 
         onNavInstructors={handleNavInstructors}
         onNavClasses={handleNavClasses}
@@ -184,6 +212,7 @@ const AppContent: React.FC = () => {
         onNavTerms={handleNavTerms}
         isHomePage={view === 'home'}
       />
+      )}
     </div>
   );
 };
