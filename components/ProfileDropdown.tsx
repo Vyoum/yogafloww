@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { User, LogOut, Settings, Calendar, CreditCard, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { isAdminEmail } from '../utils/admin';
 
 interface ProfileDropdownProps {
   isOpen: boolean;
@@ -8,12 +9,10 @@ interface ProfileDropdownProps {
   onNavAdmin?: () => void;
 }
 
-const ADMIN_EMAILS = ['admin@yogaflow.com', 'support@yogaflow.com'];
-
 export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose, onNavAdmin }) => {
   const { user, logout } = useAuth();
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+  const isAdmin = isAdminEmail(user?.email);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

@@ -8,6 +8,8 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { isAdminEmail } from '../utils/admin';
+import { LoginModal, SignupModal } from './LoginModal';
 import { ProblemSolution } from './ProblemSolution';
 import { Timeline } from './Timeline';
 import { Asanas } from './Asanas';
@@ -52,8 +54,6 @@ interface NewsletterSubscriber {
 
 type TabType = 'overview' | 'users' | 'journey' | 'asanas' | 'classes' | 'instructors' | 'community' | 'pricing' | 'meditation' | 'research' | 'contact' | 'newsletter';
 
-const ADMIN_EMAILS = ['admin@yogaflow.com', 'support@yogaflow.com']; // Add admin emails here
-
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -63,16 +63,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [userFilter, setUserFilter] = useState<'all' | 'firebase' | 'localStorage'>('all');
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
 
   // Check if user is admin
-  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+  const isAdmin = isAdminEmail(user?.email);
+  const isAuthenticated = !!user;
 
   useEffect(() => {
-    if (!isAdmin) {
-      // Redirect if not admin
-      onBack();
-      return;
-    }
+    if (!isAuthenticated) return;
+    if (!isAdmin) return;
     loadData();
   }, [isAdmin, onBack]);
 
@@ -171,8 +171,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     { id: 'newsletter' as TabType, label: 'Newsletter', icon: TrendingUp },
   ];
 
+  // Gate UI: don't silently redirect; show login/access-denied
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center">
+          <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield size={22} className="text-teal-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Admin Dashboard</h1>
+          <p className="text-slate-600 text-sm mb-6">Please sign in to continue.</p>
+          <button
+            onClick={() => setIsLoginModalOpen(true)}
+            className="w-full bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition-colors"
+          >
+            Sign in
+          </button>
+          <button
+            onClick={onBack}
+            className="mt-3 w-full text-slate-600 py-3 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+          >
+            Back to site
+          </button>
+        </div>
+
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onSwitchToSignup={() => {
+            setIsLoginModalOpen(false);
+            setIsSignupModalOpen(true);
+          }}
+        />
+        <SignupModal
+          isOpen={isSignupModalOpen}
+          onClose={() => setIsSignupModalOpen(false)}
+          onSwitchToLogin={() => {
+            setIsSignupModalOpen(false);
+            setIsLoginModalOpen(true);
+          }}
+        />
+      </div>
+    );
+  }
+
   if (!isAdmin) {
-    return null;
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center">
+          <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle size={22} className="text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Access denied</h1>
+          <p className="text-slate-600 text-sm mb-6">
+            You’re signed in as <span className="font-medium">{user?.email}</span>, but this account isn’t allowed to access admin.
+          </p>
+          <p className="text-slate-500 text-xs mb-6">
+            To allow this account, add it to <code className="font-mono">VITE_ADMIN_EMAILS</code> (comma-separated) in <code className="font-mono">.env</code>.
+          </p>
+          <button
+            onClick={onBack}
+            className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors"
+          >
+            Back to site
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

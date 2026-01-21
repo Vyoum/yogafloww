@@ -108,21 +108,31 @@ const AppContent: React.FC = () => {
     }, 100);
   };
 
-  // Check URL/hash for admin route on mount (hash avoids 404 on static hosting)
+  // Simple path-based routing for /admin (no hash)
   useEffect(() => {
-    const path = window.location.pathname;
-    const hash = window.location.hash;
-    if (path === '/admin' || path === '/admin/' || hash === '#/admin') {
-      setView('admin');
-    }
+    const syncViewFromPath = () => {
+      const path = window.location.pathname;
+      if (path === '/admin' || path === '/admin/') {
+        setView('admin');
+      } else if (path === '/' || path === '') {
+        setView('home');
+      }
+    };
+
+    // Initial sync
+    syncViewFromPath();
+
+    // Back/forward buttons
+    window.addEventListener('popstate', syncViewFromPath);
+    return () => window.removeEventListener('popstate', syncViewFromPath);
   }, []);
 
-  // Keep hash in sync so direct visits use hash-based routing (prevents 404)
+  // Update URL when view changes
   useEffect(() => {
     if (view === 'admin') {
-      window.location.hash = '#/admin';
-    } else if (window.location.hash === '#/admin') {
-      window.location.hash = '';
+      window.history.pushState({}, '', '/admin');
+    } else if (window.location.pathname === '/admin' || window.location.pathname === '/admin/') {
+      window.history.pushState({}, '', '/');
     }
   }, [view]);
 
