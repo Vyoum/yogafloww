@@ -3,7 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { LoginModal, SignupModal } from './LoginModal';
 import { Reveal } from './Reveal';
 import { ASANAS, MEDITATION_TRACKS } from '../constants';
-import { Track } from '../types';
+import { Track, Asana } from '../types';
+import { db } from '../config/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import { 
   Shield, 
   Sparkles, 
@@ -32,6 +34,7 @@ export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
   const [shouldNavigateToPricing, setShouldNavigateToPricing] = useState(false);
   const { isAuthenticated } = useAuth();
+  const [asanas, setAsanas] = useState<Asana[]>(ASANAS);
 
   // Navigate to pricing after successful login if triggered from "Join Live Workshop"
   useEffect(() => {
@@ -40,6 +43,27 @@ export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
       onNavPricing();
     }
   }, [isAuthenticated, shouldNavigateToPricing, onNavPricing]);
+
+  // Load asanas from Firestore
+  useEffect(() => {
+    const loadAsanas = async () => {
+      try {
+        const asanasSnapshot = await getDocs(collection(db, 'asanas'));
+        if (!asanasSnapshot.empty) {
+          const loadedAsanas: Asana[] = asanasSnapshot.docs.map(doc => doc.data() as Asana);
+          setAsanas(loadedAsanas);
+        }
+      } catch (error) {
+        console.error('Error loading asanas:', error);
+        // Keep default asanas on error
+      }
+    };
+    loadAsanas();
+    
+    // Poll for updates every 10 seconds
+    const interval = setInterval(loadAsanas, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleJoinWorkshop = () => {
     if (!isAuthenticated) {
@@ -165,7 +189,7 @@ export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
         </Reveal>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10 mb-32">
-          {ASANAS.map((asana, idx) => (
+          {asanas.map((asana, idx) => (
             <Reveal key={asana.id} delay={idx * 0.1}>
               <div className="group bg-white border border-slate-100 rounded-[2.5rem] p-0 hover:border-teal-200 hover:shadow-2xl transition-all duration-700 flex flex-col h-full overflow-hidden">
                 <div className="relative aspect-[16/10] overflow-hidden">

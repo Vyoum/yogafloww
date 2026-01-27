@@ -1,15 +1,41 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SectionHeading } from './SectionHeading';
 import { INSTRUCTORS } from '../constants';
 import { Award, ShieldCheck, ChevronRight } from 'lucide-react';
 import { Reveal } from './Reveal';
+import { Instructor } from '../types';
+import { db } from '../config/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface InstructorsProps {
   onViewProfile?: (id: string) => void;
 }
 
 export const Instructors: React.FC<InstructorsProps> = ({ onViewProfile }) => {
+  const [instructors, setInstructors] = useState<Instructor[]>(INSTRUCTORS);
+
+  // Load instructors from Firestore
+  useEffect(() => {
+    const loadInstructors = async () => {
+      try {
+        const instructorsSnapshot = await getDocs(collection(db, 'instructors'));
+        if (!instructorsSnapshot.empty) {
+          const loadedInstructors: Instructor[] = instructorsSnapshot.docs.map(doc => doc.data() as Instructor);
+          setInstructors(loadedInstructors);
+        }
+      } catch (error) {
+        console.error('Error loading instructors:', error);
+        // Keep default instructors on error
+      }
+    };
+    loadInstructors();
+    
+    // Poll for updates every 10 seconds
+    const interval = setInterval(loadInstructors, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <section id="instructors" className="bg-white pt-4 md:pt-8 pb-12 md:pb-20 px-4 md:px-6 relative">
       {/* 
@@ -37,7 +63,7 @@ export const Instructors: React.FC<InstructorsProps> = ({ onViewProfile }) => {
           </Reveal>
 
           <div className="grid md:grid-cols-2 gap-8 md:gap-12 mt-16">
-            {INSTRUCTORS.map((instructor, idx) => (
+            {instructors.map((instructor, idx) => (
               <Reveal key={idx} delay={idx * 0.2}>
                 <div 
                   className="bg-white rounded-[2.5rem] p-8 md:p-12 shadow-2xl flex flex-col group hover:-translate-y-3 transition-all duration-700 cursor-pointer border border-transparent hover:border-teal-200/50"

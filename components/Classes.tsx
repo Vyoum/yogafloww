@@ -4,6 +4,9 @@ import { Button } from './Button';
 import { LIVE_CLASSES, RECORDED_CLASSES } from '../constants';
 import { Clock, Play, ExternalLink, Filter, ChevronDown, Calendar, Search, X, Sparkles } from 'lucide-react';
 import { YogaClass } from '../types';
+import { getSettings } from '../utils/settings';
+import { db } from '../config/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface ClassesProps {
   initialTab?: 'live' | 'recorded';
@@ -16,11 +19,45 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
   const [filterLevel, setFilterLevel] = useState<string>('All Levels');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(true); // Default to showing overlay
+  const [classVideos, setClassVideos] = useState<Record<string, string>>({}); // classId -> videoUrl
 
   // Update activeTab when initialTab prop changes
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  // Load settings and videos
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Load settings
+        const settings = await getSettings();
+        setShowComingSoon(settings.classesComingSoon);
+        
+        // Load class videos
+        const videosSnapshot = await getDocs(collection(db, 'class_videos'));
+        const videosMap: Record<string, string> = {};
+        videosSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.classId && data.videoUrl) {
+            videosMap[data.classId] = data.videoUrl;
+          }
+        });
+        setClassVideos(videosMap);
+        console.log('✅ Loaded class videos:', Object.keys(videosMap).length);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Default to showing overlay on error
+        setShowComingSoon(true);
+      }
+    };
+    loadData();
+
+    // Listen for changes (poll every 5 seconds)
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleJoinJourney = () => {
     // Navigate to home first, then scroll to path-to-transformation
@@ -89,10 +126,10 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
         </div>
       </section>
 
-      {/* COMING SOON OVERLAY - Remove this section when ready to show classes */}
+      {/* COMING SOON OVERLAY - Controlled by admin settings */}
       <div className="relative min-h-[600px]">
-        {/* Blurred Background Content */}
-        <div className="blur-sm pointer-events-none select-none">
+        {/* Blurred Background Content - only blur if coming soon is enabled */}
+        <div className={`pointer-events-none select-none ${showComingSoon ? 'blur-sm' : ''}`}>
           {/* 2. NAVIGATION & SEARCH BAR */}
           <div className="sticky top-[64px] md:top-[72px] z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 md:px-6">
         <div className="max-w-7xl mx-auto">
@@ -218,9 +255,20 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
 
                           {/* Action */}
                           <div className="md:w-48 text-right pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
-                            <button className="w-full md:w-auto inline-flex items-center justify-center gap-3 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] text-teal-600 hover:text-teal-800 group-hover:translate-x-1 transition-all py-1 md:py-0">
-                              Enter Studio <ExternalLink size={14} />
-                            </button>
+                            {classVideos[cls.id] ? (
+                              <a 
+                                href={classVideos[cls.id]}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full md:w-auto inline-flex items-center justify-center gap-3 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] text-teal-600 hover:text-teal-800 group-hover:translate-x-1 transition-all py-1 md:py-0"
+                              >
+                                Watch Video <Play size={14} />
+                              </a>
+                            ) : (
+                              <button className="w-full md:w-auto inline-flex items-center justify-center gap-3 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] text-teal-600 hover:text-teal-800 group-hover:translate-x-1 transition-all py-1 md:py-0">
+                                Enter Studio <ExternalLink size={14} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </Reveal>
@@ -262,9 +310,20 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
                                    <span key={f} className="text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-tighter">#{f}</span>
                                  ))}
                                </div>
-                               <button className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-teal-600 hover:translate-x-1 transition-transform">
-                                 Watch Session
-                               </button>
+                               {classVideos[cls.id] ? (
+                                 <a 
+                                   href={classVideos[cls.id]}
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-teal-600 hover:translate-x-1 transition-transform flex items-center gap-1"
+                                 >
+                                   Watch <Play size={12} />
+                                 </a>
+                               ) : (
+                                 <button className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-teal-600 hover:translate-x-1 transition-transform">
+                                   Watch Session
+                                 </button>
+                               )}
                             </div>
                           </div>
                         </div>
@@ -279,24 +338,26 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
           </section>
         </div>
 
-        {/* Coming Soon Overlay */}
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-md">
-          <Reveal>
-            <div className="text-center px-6 py-12 md:py-20">
-              <div className="inline-flex items-center justify-center w-20 h-20 md:w-24 md:h-24 rounded-full bg-teal-100 mb-6 md:mb-8 animate-pulse">
-                <Sparkles className="text-teal-600" size={40} />
+        {/* Coming Soon Overlay - Only show if enabled in settings */}
+        {showComingSoon && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-md">
+            <Reveal>
+              <div className="text-center px-6 py-12 md:py-20">
+                <div className="inline-flex items-center justify-center w-20 h-20 md:w-24 md:h-24 rounded-full bg-teal-100 mb-6 md:mb-8 animate-pulse">
+                  <Sparkles className="text-teal-600" size={40} />
+                </div>
+                <h2 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 mb-4 md:mb-6">
+                  Coming <span className="text-teal-600 italic">Soon</span>
+                </h2>
+                <p className="text-lg md:text-xl text-slate-600 max-w-md mx-auto font-light leading-relaxed">
+                  We're preparing something special for you. Classes will be available soon.
+                </p>
               </div>
-              <h2 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 mb-4 md:mb-6">
-                Coming <span className="text-teal-600 italic">Soon</span>
-              </h2>
-              <p className="text-lg md:text-xl text-slate-600 max-w-md mx-auto font-light leading-relaxed">
-                We're preparing something special for you. Classes will be available soon.
-              </p>
-            </div>
-          </Reveal>
-        </div>
+            </Reveal>
+          </div>
+        )}
       </div>
-      {/* END COMING SOON OVERLAY - Remove the above section when ready to show classes */}
+      {/* END COMING SOON OVERLAY - Controlled by admin settings */}
 
       {/* 5. CTA SECTION - REFINED FOR VISIBILITY */}
       <section className="px-4 md:px-6 pb-20 md:pb-32">

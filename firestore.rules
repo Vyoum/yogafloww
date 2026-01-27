@@ -67,6 +67,30 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
     
+    // Settings Collection - PERMISSIVE FOR TESTING
+    match /settings/{documentId} {
+      // Anyone can read/write settings for now
+      allow read, write: if true;
+    }
+    
+    // Class Videos Collection - PERMISSIVE FOR TESTING
+    match /class_videos/{documentId} {
+      // Anyone can read/write for now
+      allow read, write: if true;
+    }
+    
+    // Asanas Collection - PERMISSIVE FOR TESTING
+    match /asanas/{documentId} {
+      // Anyone can read/write for now
+      allow read, write: if true;
+    }
+    
+    // Instructors Collection - PERMISSIVE FOR TESTING
+    match /instructors/{documentId} {
+      // Anyone can read/write for now
+      allow read, write: if true;
+    }
+    
     // Default deny rule for any other collections
     match /{document=**} {
       allow read, write: if false;
