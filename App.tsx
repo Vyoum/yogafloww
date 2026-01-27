@@ -24,7 +24,19 @@ import { TermsConditions } from './components/TermsConditions';
 import { AdminDashboard } from './components/AdminDashboard';
 
 const AppContent: React.FC = () => {
-  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms' | 'admin'>('home');
+  // Initialize view based on current path
+  const getInitialView = (): 'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms' | 'admin' => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/admin' || path === '/admin/') {
+        console.log('🚀 Initializing with admin view');
+        return 'admin';
+      }
+    }
+    return 'home';
+  };
+  
+  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms' | 'admin'>(getInitialView());
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
   const [classesInitialTab, setClassesInitialTab] = useState<'live' | 'recorded'>('live');
 
@@ -112,33 +124,52 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const syncViewFromPath = () => {
       const path = window.location.pathname;
+      console.log('🔄 Syncing view from path:', path);
       if (path === '/admin' || path === '/admin/') {
+        console.log('✅ Setting view to admin');
         setView('admin');
       } else if (path === '/' || path === '') {
+        console.log('✅ Setting view to home');
+        setView('home');
+      } else {
+        // For other paths, default to home
+        console.log('⚠️ Unknown path, defaulting to home');
         setView('home');
       }
     };
 
-    // Initial sync
+    // Initial sync - run immediately
     syncViewFromPath();
+
+    // Also check on mount with a small delay to catch any race conditions
+    const timeoutId = setTimeout(syncViewFromPath, 100);
 
     // Back/forward buttons
     window.addEventListener('popstate', syncViewFromPath);
-    return () => window.removeEventListener('popstate', syncViewFromPath);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('popstate', syncViewFromPath);
+    };
   }, []);
 
   // Update URL when view changes
   useEffect(() => {
+    console.log('📝 View changed to:', view);
     if (view === 'admin') {
-      window.history.pushState({}, '', '/admin');
-    } else if (window.location.pathname === '/admin' || window.location.pathname === '/admin/') {
+      if (window.location.pathname !== '/admin') {
+        console.log('🔗 Updating URL to /admin');
+        window.history.pushState({}, '', '/admin');
+      }
+    } else if (view === 'home' && (window.location.pathname === '/admin' || window.location.pathname === '/admin/')) {
+      console.log('🔗 Updating URL to /');
       window.history.pushState({}, '', '/');
     }
   }, [view]);
 
   return (
     <div className="min-h-screen bg-white text-slate-900 selection:bg-teal-100 selection:text-teal-900 antialiased">
-      {view !== 'admin' && <CustomCursor />}
+      <CustomCursor />
       {view !== 'admin' && (
         <Navbar 
           onNavHome={handleNavHome} 

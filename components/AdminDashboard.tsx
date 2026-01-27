@@ -66,22 +66,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
 
-  // Check if user is admin
-  const isAdmin = isAdminEmail(user?.email);
-  const isAuthenticated = !!user;
+  // TEMPORARY: No auth required - anyone can access
+  const isAdmin = true; // Always true for now
+  const isAuthenticated = true; // Always true for now
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      console.log('⚠️ Not authenticated, skipping data load');
-      return;
-    }
-    if (!isAdmin) {
-      console.log('⚠️ Not admin, skipping data load');
-      return;
-    }
-    console.log('✅ Admin authenticated, loading data...');
+    // Load data immediately without auth check
+    console.log('✅ Loading admin data (no auth required)...');
     loadData();
-  }, [isAdmin, isAuthenticated]);
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -255,77 +248,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     { id: 'newsletter' as TabType, label: 'Newsletter', icon: TrendingUp },
   ];
 
-  // Gate UI: don't silently redirect; show login/access-denied
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
-        <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center">
-          <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Shield size={22} className="text-teal-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Admin Dashboard</h1>
-          <p className="text-slate-600 text-sm mb-6">Please sign in to continue.</p>
-          <button
-            onClick={() => setIsLoginModalOpen(true)}
-            className="w-full bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition-colors"
-          >
-            Sign in
-          </button>
-          <button
-            onClick={onBack}
-            className="mt-3 w-full text-slate-600 py-3 rounded-xl font-medium hover:bg-slate-50 transition-colors"
-          >
-            Back to site
-          </button>
-        </div>
+  // TEMPORARY: No auth gates - show dashboard directly
 
-        <LoginModal
-          isOpen={isLoginModalOpen}
-          onClose={() => setIsLoginModalOpen(false)}
-          onSwitchToSignup={() => {
-            setIsLoginModalOpen(false);
-            setIsSignupModalOpen(true);
-          }}
-        />
-        <SignupModal
-          isOpen={isSignupModalOpen}
-          onClose={() => setIsSignupModalOpen(false)}
-          onSwitchToLogin={() => {
-            setIsSignupModalOpen(false);
-            setIsLoginModalOpen(true);
-          }}
-        />
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
-        <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center">
-          <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <XCircle size={22} className="text-red-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Access denied</h1>
-          <p className="text-slate-600 text-sm mb-6">
-            You’re signed in as <span className="font-medium">{user?.email}</span>, but this account isn’t allowed to access admin.
-          </p>
-          <p className="text-slate-500 text-xs mb-6">
-            To allow this account, add it to <code className="font-mono">VITE_ADMIN_EMAILS</code> (comma-separated) in <code className="font-mono">.env</code>.
-          </p>
-          <button
-            onClick={onBack}
-            className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors"
-          >
-            Back to site
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Debug: Log when component renders
+  useEffect(() => {
+    console.log('🎯 AdminDashboard component rendered');
+    console.log('📊 Current state:', {
+      isLoading,
+      usersCount: users.length,
+      contactsCount: contactSubmissions.length,
+      subscribersCount: newsletterSubscribers.length
+    });
+  }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50" style={{ cursor: 'default' }}>
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -345,16 +282,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Admin Dashboard</h1>
-                  <p className="text-xs text-slate-500">Welcome, {user?.name}</p>
+                  <p className="text-xs text-slate-500">Public Access (No Auth Required)</p>
                 </div>
               </div>
             </div>
             <button
-              onClick={logout}
-              className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              onClick={onBack}
+              className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
             >
-              <LogOut size={18} />
-              <span className="font-medium">Logout</span>
+              <ArrowLeft size={18} />
+              <span className="font-medium">Back to Site</span>
             </button>
           </div>
         </div>
