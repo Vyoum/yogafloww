@@ -56,7 +56,7 @@ interface NewsletterSubscriber {
   source?: string;
 }
 
-type TabType = 'overview' | 'users' | 'journey' | 'asanas' | 'asanas-manage' | 'classes' | 'classes-manage' | 'instructors' | 'instructors-manage' | 'community' | 'pricing' | 'meditation' | 'research' | 'contact' | 'newsletter';
+type TabType = 'overview' | 'users' | 'journey' | 'asanas' | 'classes' | 'classes-manage' | 'instructors' | 'instructors-manage' | 'community' | 'pricing' | 'meditation' | 'research' | 'contact' | 'newsletter';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const { user, logout } = useAuth();
@@ -329,7 +329,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     { id: 'overview' as TabType, label: 'Overview', icon: Layout },
     { id: 'users' as TabType, label: 'Users', icon: Users },
     { id: 'classes-manage' as TabType, label: 'Classes Management', icon: Video },
-    { id: 'asanas-manage' as TabType, label: 'Asanas Management', icon: BookOpen },
     { id: 'instructors-manage' as TabType, label: 'Instructors Management', icon: UsersRound },
     { id: 'journey' as TabType, label: 'Journey', icon: Activity },
     { id: 'asanas' as TabType, label: 'Asanas', icon: BookOpen },
@@ -846,78 +845,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                 </div>
               )}
 
-              {/* Asanas Management Tab */}
-              {activeTab === 'asanas-manage' && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-bold text-slate-900">Asanas Management</h2>
-                    <button
-                      onClick={() => {
-                        setEditingAsana(null);
-                        setIsAsanaFormOpen(true);
-                      }}
-                      className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2"
-                    >
-                      <Plus size={18} />
-                      <span>Add New Asana</span>
-                    </button>
-                  </div>
-
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="divide-y divide-slate-200">
-                      {asanas.length === 0 ? (
-                        <div className="px-6 py-12 text-center text-slate-500">
-                          No asanas found. Add your first asana!
-                        </div>
-                      ) : (
-                        asanas.map((asana) => (
-                          <div key={asana.id} className="p-6 hover:bg-slate-50 transition-colors">
-                            <div className="flex items-start justify-between gap-6">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-4 mb-3 flex-wrap">
-                                  <h3 className="text-xl font-bold text-slate-900">{asana.sanskritName}</h3>
-                                  <span className="text-sm text-slate-500 italic">{asana.englishName}</span>
-                                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">
-                                    {asana.level}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-slate-600 mb-2 line-clamp-2">{asana.description}</p>
-                                <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-                                  <span>Category: {asana.category}</span>
-                                  <span>•</span>
-                                  <span>Benefits: {asana.benefits?.length || 0} items</span>
-                                  <span>•</span>
-                                  <span>Steps: {asana.howTo?.length || 0} items</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <button
-                                  onClick={() => {
-                                    setEditingAsana({ ...asana });
-                                    setIsAsanaFormOpen(true);
-                                  }}
-                                  className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm"
-                                >
-                                  <Edit size={16} />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteAsana(asana.id)}
-                                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2"
-                                >
-                                  <Trash2 size={16} />
-                                  <span>Delete</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {activeTab === 'asanas' && (
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
@@ -937,15 +864,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     {/* Custom Asanas Display with Edit Buttons */}
                     <div className="p-6">
                       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {asanas.map((asana) => (
+                        {(asanas.length > 0 ? asanas : ASANAS).map((asana) => (
                           <div key={asana.id} className="group relative bg-white border border-slate-100 rounded-[2.5rem] p-0 hover:border-teal-200 hover:shadow-2xl transition-all duration-700 flex flex-col h-full overflow-hidden">
-                            {/* Edit Button - Top Right */}
+                            {/* Edit Button - Top Right - Always Visible */}
                             <button
                               onClick={() => {
                                 setEditingAsana({ ...asana });
                                 setIsAsanaFormOpen(true);
                               }}
-                              className="absolute top-4 right-4 z-10 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-1.5 text-xs shadow-lg opacity-0 group-hover:opacity-100"
+                              className="absolute top-4 right-4 z-10 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-1.5 text-xs shadow-lg"
                               title={`Edit ${asana.englishName}`}
                             >
                               <Edit size={14} />
