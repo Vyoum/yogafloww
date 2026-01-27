@@ -287,7 +287,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           setInstructors(defaultInstructors);
           console.log('✅ Initialized instructors with defaults');
         } else {
-          const loadedInstructors: Instructor[] = instructorsSnapshot.docs.map(doc => doc.data() as Instructor);
+          const loadedInstructors: Instructor[] = instructorsSnapshot.docs
+            .map(doc => doc.data() as Instructor)
+            .filter(instructor => !instructor.deleted); // Filter out deleted instructors
           setInstructors(loadedInstructors);
           console.log(`✅ Loaded ${loadedInstructors.length} instructors`);
         }
@@ -395,22 +397,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   // Handle instructor save
   const handleSaveInstructor = async (instructor: Instructor) => {
     try {
-      await setDoc(doc(db, 'instructors', instructor.id), instructor);
+      // Generate ID if new instructor
+      let finalId = instructor.id;
+      if (!finalId || finalId === '') {
+        finalId = instructor.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      }
+      
+      const finalInstructor: Instructor = {
+        ...instructor,
+        id: finalId,
+      };
+      
+      await setDoc(doc(db, 'instructors', finalId), finalInstructor);
       setInstructors(prev => {
-        const existing = prev.findIndex(i => i.id === instructor.id);
+        const existing = prev.findIndex(i => i.id === finalId);
         if (existing >= 0) {
           const updated = [...prev];
-          updated[existing] = instructor;
+          updated[existing] = finalInstructor;
           return updated;
         }
-        return [...prev, instructor];
+        return [...prev, finalInstructor];
       });
       setEditingInstructor(null);
       setIsInstructorFormOpen(false);
-      console.log('✅ Instructor saved:', instructor.id);
+      console.log('✅ Instructor saved:', finalId);
     } catch (error) {
       console.error('❌ Error saving instructor:', error);
       alert('Failed to save instructor. Please try again.');
+    }
+  };
+
+  // Handle instructor delete
+  const handleDeleteInstructor = async (instructorId: string) => {
+    if (!confirm('Are you sure you want to delete this instructor?')) return;
+    try {
+      // Mark as deleted instead of actually deleting
+      await setDoc(doc(db, 'instructors', instructorId), { deleted: true }, { merge: true });
+      setInstructors(prev => prev.filter(i => i.id !== instructorId));
+      console.log('✅ Instructor deleted:', instructorId);
+    } catch (error) {
+      console.error('❌ Error deleting instructor:', error);
+      alert('Failed to delete instructor. Please try again.');
     }
   };
 
@@ -948,26 +975,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-slate-900">Instructors Management</h2>
+                    <button
+                      onClick={() => {
+                        setEditingInstructor(null);
+                        setIsInstructorFormOpen(true);
+                      }}
+                      className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                      <Plus size={18} />
+                      <span>Add New Instructor</span>
+                    </button>
                   </div>
 
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="divide-y divide-slate-200">
                       {instructors.length === 0 ? (
                         <div className="px-6 py-12 text-center text-slate-500">
-                          No instructors found.
+                          No instructors found. Add your first instructor!
                         </div>
                       ) : (
                         instructors.map((instructor) => (
-                          <div key={instructor.id} className="p-6 hover:bg-slate-50">
+                          <div key={instructor.id} className="p-6 hover:bg-slate-50 transition-colors">
                             <div className="flex items-start justify-between gap-6">
                               <div className="flex-1">
-                                <div className="flex items-center gap-4 mb-3">
+                                <div className="flex items-center gap-4 mb-3 flex-wrap">
                                   <h3 className="text-xl font-bold text-slate-900">{instructor.name}</h3>
                                   <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">
                                     {instructor.role}
                                   </span>
                                 </div>
-                                <p className="text-sm text-slate-600 mb-2">{instructor.bio}</p>
+                                <p className="text-sm text-slate-600 mb-2 line-clamp-2">{instructor.bio}</p>
                                 <div className="flex flex-wrap gap-2 text-xs text-slate-500 mb-2">
                                   <span>Lineage: {instructor.lineage}</span>
                                   {instructor.contact && (
@@ -980,28 +1017,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                                   )}
                                 </div>
                                 <div className="flex flex-wrap gap-2 mt-3">
-                                  {instructor.specialties.slice(0, 3).map((spec, i) => (
+                                  {instructor.specialties?.slice(0, 3).map((spec, i) => (
                                     <span key={i} className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">
                                       {spec}
                                     </span>
                                   ))}
-                                  {instructor.specialties.length > 3 && (
+                                  {instructor.specialties && instructor.specialties.length > 3 && (
                                     <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">
                                       +{instructor.specialties.length - 3} more
                                     </span>
                                   )}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => {
-                                  setEditingInstructor(instructor);
-                                  setIsInstructorFormOpen(true);
-                                }}
-                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm"
-                              >
-                                <Edit size={16} />
-                                <span>Edit</span>
-                              </button>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  onClick={() => {
+                                    setEditingInstructor({ ...instructor });
+                                    setIsInstructorFormOpen(true);
+                                  }}
+                                  className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm"
+                                >
+                                  <Edit size={16} />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteInstructor(instructor.id)}
+                                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2"
+                                >
+                                  <Trash2 size={16} />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))
@@ -1594,7 +1640,7 @@ interface InstructorFormModalProps {
 }
 
 const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, onSave, onClose }) => {
-  const [formData, setFormData] = useState<Instructor>(instructor || {
+  const [formData, setFormData] = useState<Instructor>(instructor ? { ...instructor } : {
     id: '',
     name: '',
     role: '',
@@ -1608,9 +1654,50 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
     experience: [],
   });
 
+  useEffect(() => {
+    if (instructor) {
+      setFormData({ ...instructor });
+    } else {
+      setFormData({
+        id: '',
+        name: '',
+        role: '',
+        lineage: '',
+        bio: '',
+        contact: { phone: '', email: '' },
+        social: {},
+        specialties: [''],
+        education: [''],
+        achievements: [],
+        experience: [],
+      });
+    }
+  }, [instructor]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // Filter out empty array items
+    const cleanSpecialties = (formData.specialties || []).filter(s => s.trim() !== '');
+    const cleanEducation = (formData.education || []).filter(e => e.trim() !== '');
+    const cleanAchievements = (formData.achievements || []).filter(a => a.trim() !== '');
+    const cleanExperience = (formData.experience || []).filter(e => e.trim() !== '');
+    
+    // Ensure at least one specialty
+    if (cleanSpecialties.length === 0) {
+      alert('Please add at least one specialty.');
+      return;
+    }
+    
+    const finalInstructor: Instructor = {
+      ...formData,
+      specialties: cleanSpecialties,
+      education: cleanEducation,
+      achievements: cleanAchievements.length > 0 ? cleanAchievements : undefined,
+      experience: cleanExperience.length > 0 ? cleanExperience : undefined,
+    };
+    
+    onSave(finalInstructor);
   };
 
   const addArrayItem = (field: 'specialties' | 'education' | 'achievements' | 'experience') => {
@@ -1629,11 +1716,26 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4">
-        <div className="p-6 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white">
-          <h2 className="text-2xl font-bold text-slate-900">Edit Instructor</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div 
+        className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 className="text-2xl font-bold text-slate-900">
+            {instructor ? 'Edit Instructor' : 'Add New Instructor'}
+          </h2>
+          <button 
+            onClick={onClose} 
+            className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-lg"
+          >
             <X size={24} />
           </button>
         </div>
@@ -1738,14 +1840,16 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Specialties</label>
-            {(formData.specialties || []).map((spec, index) => (
+            <label className="block text-sm font-medium text-slate-700 mb-2">Specialties *</label>
+            {(formData.specialties && formData.specialties.length > 0 ? formData.specialties : ['']).map((spec, index) => (
               <div key={index} className="flex gap-2 mb-2">
                 <input
                   type="text"
+                  required={index === 0}
                   value={spec}
                   onChange={(e) => updateArrayItem('specialties', index, e.target.value)}
                   className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  placeholder={`Specialty ${index + 1}`}
                 />
                 {(formData.specialties?.length || 0) > 1 && (
                   <button
@@ -1770,13 +1874,14 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Education</label>
-            {(formData.education || []).map((edu, index) => (
+            {(formData.education && formData.education.length > 0 ? formData.education : ['']).map((edu, index) => (
               <div key={index} className="flex gap-2 mb-2">
                 <input
                   type="text"
                   value={edu}
                   onChange={(e) => updateArrayItem('education', index, e.target.value)}
                   className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  placeholder={`Education ${index + 1}`}
                 />
                 {(formData.education?.length || 0) > 1 && (
                   <button
@@ -1799,6 +1904,70 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
             </button>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Achievements (Optional)</label>
+            {(formData.achievements && formData.achievements.length > 0 ? formData.achievements : ['']).map((ach, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={ach}
+                  onChange={(e) => updateArrayItem('achievements', index, e.target.value)}
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  placeholder={`Achievement ${index + 1}`}
+                />
+                {(formData.achievements?.length || 0) > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeArrayItem('achievements', index)}
+                    className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => addArrayItem('achievements')}
+              className="mt-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Achievement
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Experience (Optional)</label>
+            {(formData.experience && formData.experience.length > 0 ? formData.experience : ['']).map((exp, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={exp}
+                  onChange={(e) => updateArrayItem('experience', index, e.target.value)}
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  placeholder={`Experience ${index + 1}`}
+                />
+                {(formData.experience?.length || 0) > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeArrayItem('experience', index)}
+                    className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => addArrayItem('experience')}
+              className="mt-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Experience
+            </button>
+          </div>
+
           <div className="flex justify-end gap-4 pt-4 border-t border-slate-200">
             <button
               type="button"
@@ -1811,7 +1980,7 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
               type="submit"
               className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
             >
-              Update Instructor
+              {instructor ? 'Update' : 'Create'} Instructor
             </button>
           </div>
         </form>
