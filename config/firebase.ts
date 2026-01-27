@@ -28,6 +28,34 @@ const googleProvider = new GoogleAuthProvider();
 // Initialize Cloud Firestore and get a reference to the service
 const db = getFirestore(app);
 
+// Debug: Log Firebase initialization and test connectivity
+if (typeof window !== 'undefined') {
+  console.log('🔥 Firebase Config:', {
+    projectId: firebaseConfig.projectId,
+    authDomain: firebaseConfig.authDomain,
+    hasApiKey: !!firebaseConfig.apiKey,
+    apiKeyStart: firebaseConfig.apiKey?.substring(0, 10) + '...'
+  });
+  console.log('📦 Firestore db initialized:', !!db);
+  console.log('📦 Firestore app name:', db.app.name);
+  console.log('📦 Firestore app options:', db.app.options);
+  
+  // Test Firestore connectivity
+  import('firebase/firestore').then(async ({ doc, getDoc }) => {
+    try {
+      console.log('🔍 Testing Firestore connectivity...');
+      // Try to read a non-existent document (should return null, not error)
+      const testRef = doc(db, '_test_connection_', 'test');
+      const testSnap = await getDoc(testRef);
+      console.log('✅ Firestore is accessible! (test doc exists:', testSnap.exists(), ')');
+    } catch (error: any) {
+      console.error('❌ Firestore connectivity test failed:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+    }
+  });
+}
+
 // Initialize Analytics only in browser environment
 let analytics;
 if (typeof window !== 'undefined') {

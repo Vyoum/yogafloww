@@ -26,6 +26,14 @@ export const Contact: React.FC = () => {
     setFormState('submitting');
     setErrorMessage('');
 
+    // Add timeout to prevent infinite "sending" state
+    let isTimedOut = false;
+    const timeoutId = setTimeout(() => {
+      isTimedOut = true;
+      setFormState('error');
+      setErrorMessage('Request timed out. Please check your connection and try again.');
+    }, 15000); // 15 second timeout
+
     try {
       await saveContactMessage({
         name: formData.name,
@@ -34,18 +42,44 @@ export const Contact: React.FC = () => {
         message: formData.message
       });
       
-      setFormState('success');
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        inquiryType: 'General Inquiry',
-        message: ''
-      });
+      clearTimeout(timeoutId);
+      if (!isTimedOut) {
+        setFormState('success');
+        // Reset form
+        setFormData({
+          name: '',
+          email: '',
+          inquiryType: 'General Inquiry',
+          message: ''
+        });
+      }
     } catch (error: any) {
-      console.error('Error submitting contact form:', error);
-      setFormState('error');
-      setErrorMessage(error.message || 'Failed to send message. Please try again or contact us directly.');
+      clearTimeout(timeoutId);
+      if (!isTimedOut) {
+        console.error('Error submitting contact form:', error);
+        setFormState('error');
+        
+        // Provide user-friendly error messages
+        let errorMsg = 'Failed to send message. Please try again or contact us directly.';
+        
+        if (error.message) {
+          if (error.message.includes('permission-denied') || error.message.includes('Permission denied')) {
+            errorMsg = 'Permission denied. Please check your connection and try again.';
+          } else if (error.message.includes('unavailable') || error.message.includes('network')) {
+            errorMsg = 'Network error. Please check your internet connection and try again.';
+          } else {
+            errorMsg = error.message;
+          }
+        } else if (error.code) {
+          if (error.code === 'permission-denied') {
+            errorMsg = 'Permission denied. Please check Firestore security rules.';
+          } else if (error.code === 'unavailable') {
+            errorMsg = 'Service unavailable. Please check your internet connection.';
+          }
+        }
+        
+        setErrorMessage(errorMsg);
+      }
     }
   };
 

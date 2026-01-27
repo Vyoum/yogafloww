@@ -71,68 +71,152 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const isAuthenticated = !!user;
 
   useEffect(() => {
-    if (!isAuthenticated) return;
-    if (!isAdmin) return;
+    if (!isAuthenticated) {
+      console.log('⚠️ Not authenticated, skipping data load');
+      return;
+    }
+    if (!isAdmin) {
+      console.log('⚠️ Not admin, skipping data load');
+      return;
+    }
+    console.log('✅ Admin authenticated, loading data...');
     loadData();
-  }, [isAdmin, onBack]);
+  }, [isAdmin, isAuthenticated]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load Firebase users (from auth - we'll simulate this since we can't directly list users)
-      // In production, you'd use Firebase Admin SDK on backend
-      const firebaseUsers: UserData[] = [];
+      console.log('📊 Loading admin data...');
       
-      // Load localStorage users
-      const localUsers = JSON.parse(localStorage.getItem('yogaFlowUsers') || '[]');
-      const localStorageUsers: UserData[] = localUsers.map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        joinDate: u.joinDate,
-        plan: u.plan,
-        source: 'localStorage' as const,
-      }));
+      // Load users from Firestore
+      try {
+        console.log('👥 Loading users from Firestore...');
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const firestoreUsers: UserData[] = usersSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || 'Unknown',
+            email: data.email || '',
+            joinDate: data.joinDate || data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+            plan: data.plan || null,
+            lastLogin: data.lastLoginAt?.toDate?.()?.toISOString() || null,
+            source: 'firebase' as const,
+          };
+        });
+        console.log(`✅ Loaded ${firestoreUsers.length} users from Firestore`);
+        
+        // Also load localStorage users (for backward compatibility)
+        const localUsers = JSON.parse(localStorage.getItem('yogaFlowUsers') || '[]');
+        const localStorageUsers: UserData[] = localUsers.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          joinDate: u.joinDate,
+          plan: u.plan,
+          source: 'localStorage' as const,
+        }));
 
-      // Combine users
-      const allUsers = [...firebaseUsers, ...localStorageUsers];
-      setUsers(allUsers);
+        // Combine users (Firestore users first, then localStorage)
+        const allUsers = [...firestoreUsers, ...localStorageUsers];
+        console.log(`📊 Total users: ${allUsers.length} (${firestoreUsers.length} from Firestore, ${localStorageUsers.length} from localStorage)`);
+        setUsers(allUsers);
+      } catch (error: any) {
+        console.error('❌ Error loading users:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        // Set empty array on error
+        setUsers([]);
+      }
 
       // Load contact form submissions
       try {
-        const contactQuery = query(
-          collection(db, 'contact_form'),
-          orderBy('timestamp', 'desc'),
-          limit(100)
-        );
-        const contactSnapshot = await getDocs(contactQuery);
-        const contacts: ContactSubmission[] = contactSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        } as ContactSubmission));
+        console.log('📧 Loading contact form submissions...');
+        // Try with orderBy first, fallback to simple query if timestamp doesn't exist
+        let contactSnapshot;
+        try {
+          const contactQuery = query(
+            collection(db, 'contact_form'),
+            orderBy('createdAt', 'desc'),
+            limit(100)
+          );
+          contactSnapshot = await getDocs(contactQuery);
+        } catch (orderByError: any) {
+          // If orderBy fails (no index or field missing), just get all docs
+          console.warn('⚠️ orderBy failed, using simple query:', orderByError);
+          contactSnapshot = await getDocs(collection(db, 'contact_form'));
+        }
+        
+        const contacts: ContactSubmission[] = contactSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || '',
+            email: data.email || '',
+            inquiryType: data.inquiryType || 'General Inquiry',
+            message: data.message || '',
+            timestamp: data.timestamp,
+            createdAt: data.createdAt || data.timestamp?.toDate?.()?.toISOString() || new Date().toISOString(),
+          };
+        });
+        // Sort by createdAt if orderBy didn't work
+        contacts.sort((a, b) => {
+          const dateA = new Date(a.createdAt || '').getTime();
+          const dateB = new Date(b.createdAt || '').getTime();
+          return dateB - dateA;
+        });
+        console.log(`✅ Loaded ${contacts.length} contact submissions`);
         setContactSubmissions(contacts);
-      } catch (error) {
-        console.error('Error loading contact submissions:', error);
+      } catch (error: any) {
+        console.error('❌ Error loading contact submissions:', error);
+        console.error('Error code:', error.code);
+        setContactSubmissions([]);
       }
 
       // Load newsletter subscribers
       try {
-        const newsletterQuery = query(
-          collection(db, 'newsletter_subscribers'),
-          orderBy('subscribedAt', 'desc'),
-          limit(100)
-        );
-        const newsletterSnapshot = await getDocs(newsletterQuery);
-        const subscribers: NewsletterSubscriber[] = newsletterSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        } as NewsletterSubscriber));
+        console.log('📬 Loading newsletter subscribers...');
+        let newsletterSnapshot;
+        try {
+          const newsletterQuery = query(
+            collection(db, 'newsletter_subscribers'),
+            orderBy('subscribedAt', 'desc'),
+            limit(100)
+          );
+          newsletterSnapshot = await getDocs(newsletterQuery);
+        } catch (orderByError: any) {
+          console.warn('⚠️ orderBy failed, using simple query:', orderByError);
+          newsletterSnapshot = await getDocs(collection(db, 'newsletter_subscribers'));
+        }
+        
+        const subscribers: NewsletterSubscriber[] = newsletterSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            email: data.email || '',
+            subscribedAt: data.subscribedAt,
+            source: data.source || 'unknown',
+          };
+        });
+        // Sort by subscribedAt if orderBy didn't work
+        subscribers.sort((a, b) => {
+          const dateA = a.subscribedAt?.toDate?.()?.getTime() || 0;
+          const dateB = b.subscribedAt?.toDate?.()?.getTime() || 0;
+          return dateB - dateA;
+        });
+        console.log(`✅ Loaded ${subscribers.length} newsletter subscribers`);
         setNewsletterSubscribers(subscribers);
-      } catch (error) {
-        console.error('Error loading newsletter subscribers:', error);
+      } catch (error: any) {
+        console.error('❌ Error loading newsletter subscribers:', error);
+        console.error('Error code:', error.code);
+        setNewsletterSubscribers([]);
       }
-    } catch (error) {
-      console.error('Error loading admin data:', error);
+      
+      console.log('✅ Admin data loading complete');
+    } catch (error: any) {
+      console.error('❌ Error loading admin data:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
     } finally {
       setIsLoading(false);
     }

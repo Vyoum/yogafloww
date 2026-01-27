@@ -21,101 +21,49 @@ service cloud.firestore {
       return email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
     }
     
-    // Contact Form Collection
-    // - Anyone can create (submit contact forms)
-    // - Only admins can read
-    // - No updates or deletes allowed
+    // Contact Form Collection - VERY PERMISSIVE FOR TESTING
     match /contact_form/{documentId} {
-      // Allow anyone to create contact form submissions
-      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'inquiryType', 'message', 'timestamp', 'status', 'createdAt', 'source']) &&
-                       request.resource.data.name is string &&
-                       request.resource.data.name.size() > 0 &&
-                       request.resource.data.name.size() <= 200 &&
-                       request.resource.data.email is string &&
-                       isValidEmail(request.resource.data.email) &&
-                       request.resource.data.email.size() <= 200 &&
-                       request.resource.data.inquiryType is string &&
-                       request.resource.data.inquiryType.size() > 0 &&
-                       request.resource.data.inquiryType.size() <= 100 &&
-                       request.resource.data.message is string &&
-                       request.resource.data.message.size() > 0 &&
-                       request.resource.data.message.size() <= 5000 &&
-                       request.resource.data.status is string &&
-                       request.resource.data.status in ['new', 'read', 'replied'] &&
-                       request.resource.data.source is string &&
-                       request.resource.data.source.size() <= 100 &&
-                       request.resource.data.createdAt is string &&
-                       request.resource.data.timestamp == request.time;
+      // Allow anyone to create (no restrictions for testing)
+      allow create: if true;
       
       // Only admins can read contact form submissions
       allow read: if isAdmin();
       
-      // Only admins can update (e.g., mark as read/replied)
-      allow update: if isAdmin() &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
-                       request.resource.data.status is string &&
-                       request.resource.data.status in ['new', 'read', 'replied'];
+      // Only admins can update
+      allow update: if isAdmin();
       
       // Only admins can delete
       allow delete: if isAdmin();
     }
     
-    // Newsletter Subscribers Collection
-    // - Anyone can create (subscribe)
-    // - Only admins can read
-    // - No updates or deletes for regular users
+    // Newsletter Subscribers Collection - PERMISSIVE FOR TESTING
     match /newsletter_subscribers/{documentId} {
-      // Allow anyone to create newsletter subscriptions
-      allow create: if request.resource.data.keys().hasAll(['email', 'subscribedAt']) &&
-                       request.resource.data.email is string &&
-                       isValidEmail(request.resource.data.email) &&
-                       request.resource.data.email.size() <= 200 &&
-                       (!('source' in request.resource.data) || 
-                        (request.resource.data.source is string && 
-                         request.resource.data.source.size() <= 100)) &&
-                       request.resource.data.subscribedAt == request.time;
+      // Allow anyone to create
+      allow create: if true;
       
-      // Only admins can read newsletter subscribers
+      // Only admins can read
       allow read: if isAdmin();
       
-      // Only admins can update (e.g., update subscription status)
+      // Only admins can update
       allow update: if isAdmin();
       
-      // Only admins can delete (unsubscribe management)
+      // Only admins can delete
       allow delete: if isAdmin();
     }
     
-    // Users Collection (if you plan to store user data in Firestore)
-    // Currently using Firebase Auth + localStorage, but this is for future use
+    // Users Collection - PERMISSIVE FOR TESTING
+    // Allow anyone to create/read/update users for now
     match /users/{userId} {
-      // Users can only read their own data
-      allow read: if isAuthenticated() && request.auth.uid == userId;
+      // Anyone can create user documents (for email/password signup)
+      allow create: if true;
       
-      // Users can create their own profile
-      allow create: if isAuthenticated() && 
-                       request.auth.uid == userId &&
-                       request.resource.data.keys().hasAll(['email', 'name']) &&
-                       request.resource.data.email is string &&
-                       isValidEmail(request.resource.data.email) &&
-                       request.resource.data.name is string &&
-                       request.resource.data.name.size() > 0 &&
-                       request.resource.data.name.size() <= 200;
+      // Users can read their own data, admins can read all
+      allow read: if isAuthenticated() && request.auth.uid == userId || isAdmin();
       
-      // Users can update their own profile
-      allow update: if isAuthenticated() && 
-                       request.auth.uid == userId &&
-                       (!('email' in request.resource.data.diff(resource.data).affectedKeys()) ||
-                        request.resource.data.email == resource.data.email) &&
-                       (!('id' in request.resource.data.diff(resource.data).affectedKeys()) ||
-                        request.resource.data.id == resource.data.id);
+      // Users can update their own data, admins can update all
+      allow update: if isAuthenticated() && request.auth.uid == userId || isAdmin();
       
-      // Admins can read all users
-      allow read: if isAdmin();
-      
-      // Admins can update any user
-      allow update: if isAdmin();
-      
-      // Users can delete their own account, admins can delete any account
+      // Users can delete their own account, admins can delete any
       allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
     

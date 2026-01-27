@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { auth, db } from '../config/firebase';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 interface User {
   id: string;
@@ -26,7 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Listen for Firebase auth state changes
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         // User is signed in with Firebase
         const userData: User = {
@@ -37,6 +38,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setUser(userData);
         localStorage.setItem('yogaFlowUser', JSON.stringify(userData));
+        
+        // Save/update user in Firestore
+        try {
+          console.log('👤 Saving user to Firestore:', firebaseUser.uid);
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userRef);
+          
+          if (!userDoc.exists()) {
+            // New user - create document
+            console.log('✨ Creating new user document');
+            await setDoc(userRef, {
+              name: firebaseUser.displayName || 'User',
+              email: firebaseUser.email || '',
+              joinDate: firebaseUser.metadata.creationTime || serverTimestamp(),
+              createdAt: serverTimestamp(),
+              authProvider: 'google',
+              photoURL: firebaseUser.photoURL || null,
+            });
+            console.log('✅ User document created successfully');
+          } else {
+            // Existing user - update last login
+            console.log('🔄 Updating existing user document');
+            await setDoc(userRef, {
+              name: firebaseUser.displayName || userDoc.data().name || 'User',
+              email: firebaseUser.email || userDoc.data().email || '',
+              photoURL: firebaseUser.photoURL || userDoc.data().photoURL || null,
+              lastLoginAt: serverTimestamp(),
+            }, { merge: true });
+            console.log('✅ User document updated successfully');
+          }
+        } catch (error: any) {
+          console.error('❌ Error saving user to Firestore:', error);
+          console.error('Error code:', error.code);
+          console.error('Error message:', error.message);
+        }
       } else {
         // User is signed out, check localStorage for manual login
         const savedUser = localStorage.getItem('yogaFlowUser');
@@ -66,8 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // In a real app, this would make an API call
-    // For now, we'll check localStorage for existing users
+    // Check localStorage for existing users
     const users = JSON.parse(localStorage.getItem('yogaFlowUsers') || '[]');
     const foundUser = users.find((u: any) => u.email === email && u.password === password);
     
@@ -81,14 +116,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       setUser(userData);
       localStorage.setItem('yogaFlowUser', JSON.stringify(userData));
+      
+      // Update Firestore with last login time
+      try {
+        console.log('👤 Updating user in Firestore on login:', foundUser.id);
+        const userRef = doc(db, 'users', foundUser.id);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          // Update last login
+          console.log('🔄 Updating last login time');
+          await setDoc(userRef, {
+            lastLoginAt: serverTimestamp(),
+            plan: foundUser.plan || null,
+          }, { merge: true });
+          console.log('✅ User updated successfully');
+        } else {
+          // User exists in localStorage but not in Firestore - create it
+          console.log('✨ Creating user document from localStorage data');
+          await setDoc(userRef, {
+            name: foundUser.name,
+            email: foundUser.email.toLowerCase().trim(),
+            joinDate: foundUser.joinDate || serverTimestamp(),
+            createdAt: serverTimestamp(),
+            authProvider: 'email',
+            plan: foundUser.plan || null,
+            lastLoginAt: serverTimestamp(),
+          });
+          console.log('✅ User created successfully');
+        }
+      } catch (error: any) {
+        console.error('❌ Error updating user in Firestore:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        // Don't fail login if Firestore fails
+      }
+      
       return true;
     }
     return false;
   };
 
   const signup = async (name: string, email: string, password: string): Promise<boolean> => {
-    // In a real app, this would make an API call
-    // For now, we'll store in localStorage
+    // Check localStorage for existing users
     const users = JSON.parse(localStorage.getItem('yogaFlowUsers') || '[]');
     
     // Check if user already exists
@@ -96,12 +166,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
+    const userId = Date.now().toString();
+    const joinDate = new Date().toISOString();
+    
     const newUser = {
-      id: Date.now().toString(),
+      id: userId,
       name,
       email,
       password, // In production, this should be hashed
-      joinDate: new Date().toISOString(),
+      joinDate,
     };
 
     users.push(newUser);
@@ -115,6 +188,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setUser(userData);
     localStorage.setItem('yogaFlowUser', JSON.stringify(userData));
+    
+    // Save user to Firestore
+    try {
+      console.log('👤 Saving new email/password user to Firestore:', userId);
+      const userRef = doc(db, 'users', userId);
+      await setDoc(userRef, {
+        name,
+        email: email.toLowerCase().trim(),
+        joinDate,
+        createdAt: serverTimestamp(),
+        authProvider: 'email',
+        plan: null,
+      });
+      console.log('✅ User saved to Firestore successfully');
+    } catch (error: any) {
+      console.error('❌ Error saving user to Firestore:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      // Don't fail signup if Firestore fails, localStorage is the fallback
+    }
+    
     return true;
   };
 
