@@ -4,16 +4,16 @@ import {
   MessageSquare, Music, FileText, Search, Filter, Download,
   ArrowLeft, Shield, Calendar, Mail, User as UserIcon, LogOut,
   TrendingUp, Eye, Edit, Trash2, CheckCircle2, XCircle, Upload, Video, ToggleLeft, ToggleRight, Plus,
-  Sparkles, Target, ChevronRight
+  Sparkles, Target, ChevronRight, X, ShieldCheck, Microscope, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
 import { isAdminEmail } from '../utils/admin';
 import { getSettings, updateSettings } from '../utils/settings';
-import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS } from '../constants';
+import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS, RESEARCH_TOPICS } from '../constants';
 import { initializeAllCollections, initializeAsanas, initializeResearch } from '../utils/initializeCollections';
-import { Asana, Instructor } from '../types';
+import { Asana, Instructor, ResearchTopic } from '../types';
 import { LoginModal, SignupModal } from './LoginModal';
 import { ProblemSolution } from './ProblemSolution';
 import { Timeline } from './Timeline';
@@ -85,6 +85,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [editingInstructor, setEditingInstructor] = useState<Instructor | null>(null);
   const [isInstructorFormOpen, setIsInstructorFormOpen] = useState(false);
+  
+  // Research management state
+  const [researchTopics, setResearchTopics] = useState<ResearchTopic[]>([]);
+  const [editingResearch, setEditingResearch] = useState<ResearchTopic | null>(null);
+  const [isResearchFormOpen, setIsResearchFormOpen] = useState(false);
 
   // TEMPORARY: No auth required - anyone can access
   const isAdmin = true; // Always true for now
@@ -298,6 +303,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         console.error('❌ Error loading instructors:', error);
         // Fallback to constants
         setInstructors(INSTRUCTORS);
+      }
+
+      // Load research topics from Firestore
+      try {
+        console.log('🔬 Loading research topics...');
+        const researchSnapshot = await getDocs(collection(db, 'research'));
+        if (researchSnapshot.empty) {
+          // Initialize with default research topics if empty
+          const defaultResearch = RESEARCH_TOPICS;
+          for (const topic of defaultResearch) {
+            await setDoc(doc(db, 'research', topic.id), topic);
+          }
+          setResearchTopics(defaultResearch);
+          console.log('✅ Initialized research topics with defaults');
+        } else {
+          const loadedResearch: ResearchTopic[] = researchSnapshot.docs
+            .map(doc => doc.data() as ResearchTopic);
+          setResearchTopics(loadedResearch);
+          console.log(`✅ Loaded ${loadedResearch.length} research topics`);
+        }
+      } catch (error: any) {
+        console.error('❌ Error loading research topics:', error);
+        // Fallback to constants
+        setResearchTopics(RESEARCH_TOPICS);
       }
       
       console.log('✅ Admin data loading complete');
@@ -575,6 +604,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     }
   };
 
+  // Handle research topic save
+  const handleSaveResearch = async (topic: ResearchTopic) => {
+    try {
+      console.log('💾 Attempting to save research topic:', topic.id || 'new topic');
+      await saveWithRetry(
+        () => setDoc(doc(db, 'research', topic.id), topic),
+        `Save research topic ${topic.id}`
+      );
+      setResearchTopics(prev => {
+        const existing = prev.findIndex(t => t.id === topic.id);
+        if (existing >= 0) {
+          const updated = [...prev];
+          updated[existing] = topic;
+          return updated;
+        }
+        return [...prev, topic];
+      });
+      setEditingResearch(null);
+      setIsResearchFormOpen(false);
+      console.log('✅ Research topic saved successfully to Firestore:', topic.id);
+      alert('Research topic saved successfully!');
+    } catch (error: any) {
+      console.error('❌ Error saving research topic:', error);
+      alert(`Failed to save research topic: ${error.message}. Please try again.`);
+    }
+  };
+
+  // Handle research topic delete
+  const handleDeleteResearch = async (topicId: string) => {
+    if (!confirm('Are you sure you want to delete this research topic?')) return;
+    try {
+      console.log('🗑️ Attempting to delete research topic:', topicId);
+      // Mark as deleted instead of actually deleting
+      await saveWithRetry(
+        () => setDoc(doc(db, 'research', topicId), { deleted: true }, { merge: true }),
+        `Delete research topic ${topicId}`
+      );
+      setResearchTopics(prev => prev.filter(t => t.id !== topicId));
+      console.log('✅ Research topic deleted successfully from Firestore:', topicId);
+      alert('Research topic deleted successfully!');
+    } catch (error: any) {
+      console.error('❌ Error deleting research topic:', error);
+      alert(`Failed to delete research topic: ${error.message}. Please try again.`);
+    }
+  };
+
   // Handle video upload (simplified - just URL input for now)
   const handleVideoUpload = async (classId: string, videoUrl: string) => {
     if (!videoUrl.trim()) {
@@ -748,7 +823,74 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     </div>
                   </div>
 
-                  {/* Recent Activity */}
+                  {/* Initialize Collections */}
+                  <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-bold text-slate-900 mb-2">Initialize Collections</h3>
+                    <p className="text-sm text-slate-600 mb-4">
+                      Store all default asanas and research topics in Firestore. This will only add items that don't already exist.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const result = await initializeAsanas();
+                            alert(`Asanas initialized!\n${result.added} added, ${result.skipped} skipped.\n\nPlease refresh the page to see the updated data.`);
+                            // Reload asanas
+                            const asanasSnapshot = await getDocs(collection(db, 'asanas'));
+                            const loadedAsanas: Asana[] = asanasSnapshot.docs
+                              .map(doc => doc.data() as Asana)
+                              .filter(asana => !asana.deleted);
+                            setAsanas(loadedAsanas);
+                          } catch (error: any) {
+                            console.error('Error initializing asanas:', error);
+                            alert(`Failed to initialize asanas: ${error.message || 'Unknown error'}`);
+                          }
+                        }}
+                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2"
+                      >
+                        <BookOpen size={18} />
+                        <span>Initialize Asanas</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const result = await initializeResearch();
+                            alert(`Research topics initialized!\n${result.added} added, ${result.skipped} skipped.`);
+                          } catch (error: any) {
+                            console.error('Error initializing research:', error);
+                            alert(`Failed to initialize research: ${error.message || 'Unknown error'}`);
+                          }
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                      >
+                        <FileText size={18} />
+                        <span>Initialize Research</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await initializeAllCollections();
+                            alert('All collections initialized successfully!\n\nPlease refresh the page to see the updated data.');
+                            // Reload asanas
+                            const asanasSnapshot = await getDocs(collection(db, 'asanas'));
+                            const loadedAsanas: Asana[] = asanasSnapshot.docs
+                              .map(doc => doc.data() as Asana)
+                              .filter(asana => !asana.deleted);
+                            setAsanas(loadedAsanas);
+                          } catch (error: any) {
+                            console.error('Error initializing collections:', error);
+                            alert(`Failed to initialize collections: ${error.message || 'Unknown error'}`);
+                          }
+                        }}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                      >
+                        <Activity size={18} />
+                        <span>Initialize All</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
                   <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
                     <h3 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1378,9 +1520,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
 
               {activeTab === 'research' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-slate-900 mb-6">Research Section Preview</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-slate-900">Research Section Preview</h2>
+                    <button
+                      onClick={() => {
+                        setEditingResearch(null);
+                        setIsResearchFormOpen(true);
+                      }}
+                      className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                      <Plus size={18} />
+                      <span>Add New Research Topic</span>
+                    </button>
+                  </div>
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <Research />
+                    <div className="p-6">
+                      <div className="space-y-12">
+                        {(researchTopics.length > 0 ? researchTopics : RESEARCH_TOPICS).map((topic, idx) => (
+                          <div key={topic.id} className="group relative grid lg:grid-cols-[1.5fr,2fr] gap-8 md:gap-16 items-start border-t border-slate-100 pt-16">
+                            {/* Edit Button - Top Right */}
+                            <button
+                              onClick={() => {
+                                setEditingResearch({ ...topic });
+                                setIsResearchFormOpen(true);
+                              }}
+                              className="absolute top-4 right-4 z-10 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-1.5 text-xs shadow-lg"
+                              title={`Edit ${topic.benefit}`}
+                            >
+                              <Edit size={14} />
+                              <span>Edit</span>
+                            </button>
+                            
+                            {/* Left Side: The Claim */}
+                            <div className="space-y-6">
+                              <div className="flex items-center gap-4">
+                                <div className="p-3 bg-teal-50 rounded-2xl text-teal-600 group-hover:bg-teal-600 group-hover:text-white transition-all duration-700">
+                                  <ShieldCheck size={24} />
+                                </div>
+                                <h3 className="text-2xl md:text-3xl font-serif font-bold text-slate-900">{topic.benefit}</h3>
+                              </div>
+                              <p className="text-lg text-slate-600 font-light leading-relaxed">
+                                {topic.description}
+                              </p>
+                            </div>
+
+                            {/* Right Side: The Evidence */}
+                            <div className="bg-slate-50/50 rounded-[2.5rem] p-8 md:p-12 border border-slate-100">
+                              <div className="flex items-center gap-2 mb-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <Microscope size={14} className="text-teal-500" /> Academic References
+                              </div>
+                              <div className="space-y-4">
+                                {topic.papers.map((paper, pIdx) => (
+                                  <a 
+                                    key={pIdx} 
+                                    href={paper.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl hover:border-teal-300 hover:shadow-lg transition-all group/link"
+                                  >
+                                    <div className="flex items-center gap-4">
+                                       <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover/link:text-teal-600 transition-colors">
+                                          <BookOpen size={14} />
+                                       </div>
+                                       <span className="text-sm font-medium text-slate-700 leading-snug max-w-[80%]">{paper.title}</span>
+                                    </div>
+                                    <ExternalLink size={16} className="text-slate-300 group-hover/link:text-teal-500 transition-colors" />
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1409,6 +1621,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           onClose={() => {
             setIsInstructorFormOpen(false);
             setEditingInstructor(null);
+          }}
+        />
+      )}
+
+      {/* Research Form Modal */}
+      {isResearchFormOpen && (
+        <ResearchFormModal
+          topic={editingResearch}
+          onSave={handleSaveResearch}
+          onClose={() => {
+            setIsResearchFormOpen(false);
+            setEditingResearch(null);
           }}
         />
       )}
@@ -2134,6 +2358,207 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
               className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
             >
               {instructor ? 'Update' : 'Create'} Instructor
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Research Form Modal Component
+interface ResearchFormModalProps {
+  topic: ResearchTopic | null;
+  onSave: (topic: ResearchTopic) => void;
+  onClose: () => void;
+}
+
+const ResearchFormModal: React.FC<ResearchFormModalProps> = ({ topic, onSave, onClose }) => {
+  // Helper to safely initialize form data with defaults for missing fields
+  const getInitialFormData = (topicData: ResearchTopic | null): ResearchTopic => {
+    if (!topicData) {
+      return {
+        id: '',
+        benefit: '',
+        description: '',
+        papers: [{ title: '', url: '' }],
+      };
+    }
+    
+    return {
+      id: topicData.id || '',
+      benefit: topicData.benefit || '',
+      description: topicData.description || '',
+      papers: (topicData.papers && topicData.papers.length > 0) ? [...topicData.papers] : [{ title: '', url: '' }],
+    };
+  };
+
+  const [formData, setFormData] = useState<ResearchTopic>(getInitialFormData(topic));
+
+  useEffect(() => {
+    setFormData(getInitialFormData(topic));
+  }, [topic]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Generate ID if new topic
+    let finalId = formData.id;
+    if (!finalId || finalId === '') {
+      finalId = formData.benefit.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+    
+    // Filter out empty papers
+    const cleanPapers = formData.papers.filter(p => p.title.trim() !== '' && p.url.trim() !== '');
+    
+    // Ensure at least one paper
+    if (cleanPapers.length === 0) {
+      alert('Please add at least one research paper with both title and URL.');
+      return;
+    }
+    
+    const finalTopic: ResearchTopic = {
+      ...formData,
+      id: finalId,
+      papers: cleanPapers,
+    };
+    
+    onSave(finalTopic);
+  };
+
+  const addPaper = () => {
+    const currentPapers = formData.papers && formData.papers.length > 0 ? formData.papers : [{ title: '', url: '' }];
+    setFormData({ ...formData, papers: [...currentPapers, { title: '', url: '' }] });
+  };
+
+  const updatePaper = (index: number, field: 'title' | 'url', value: string) => {
+    const currentPapers = formData.papers && formData.papers.length > 0 ? [...formData.papers] : [{ title: '', url: '' }];
+    if (index >= currentPapers.length) {
+      currentPapers.push({ title: '', url: '' });
+    }
+    currentPapers[index] = { ...currentPapers[index], [field]: value };
+    setFormData({ ...formData, papers: currentPapers });
+  };
+
+  const removePaper = (index: number) => {
+    const currentPapers = formData.papers && formData.papers.length > 0 ? formData.papers : [{ title: '', url: '' }];
+    const newPapers = currentPapers.filter((_, i) => i !== index);
+    // Ensure at least one paper remains
+    setFormData({ ...formData, papers: newPapers.length > 0 ? newPapers : [{ title: '', url: '' }] });
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div 
+        className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 className="text-2xl font-bold text-slate-900">
+            {topic ? 'Edit Research Topic' : 'Add New Research Topic'}
+          </h2>
+          <button 
+            onClick={onClose} 
+            className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-lg"
+          >
+            <X size={24} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Benefit *</label>
+            <input
+              type="text"
+              required
+              value={formData.benefit}
+              onChange={(e) => setFormData({ ...formData, benefit: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              placeholder="e.g., Anxiety Reduction"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Description *</label>
+            <textarea
+              required
+              rows={4}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              placeholder="Describe the research finding..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Research Papers *</label>
+            {(formData.papers && formData.papers.length > 0 ? formData.papers : [{ title: '', url: '' }]).map((paper, index) => (
+              <div key={index} className="mb-4 p-4 border border-slate-200 rounded-lg space-y-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-slate-600">Paper {index + 1}</span>
+                  {(formData.papers?.length || 0) > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removePaper(index)}
+                      className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={paper.title || ''}
+                    onChange={(e) => updatePaper(index, 'title', e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 text-sm"
+                    placeholder="Research paper title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">URL *</label>
+                  <input
+                    type="url"
+                    required
+                    value={paper.url || ''}
+                    onChange={(e) => updatePaper(index, 'url', e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 text-sm"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addPaper}
+              className="mt-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Research Paper
+            </button>
+          </div>
+
+          <div className="flex justify-end gap-4 pt-4 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+            >
+              {topic ? 'Update' : 'Create'} Research Topic
             </button>
           </div>
         </form>

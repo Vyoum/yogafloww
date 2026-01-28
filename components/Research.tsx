@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Reveal } from './Reveal';
 import { RESEARCH_TOPICS } from '../constants';
+import { ResearchTopic } from '../types';
+import { db } from '../config/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import { 
   BookOpen, 
   ExternalLink, 
@@ -10,6 +13,29 @@ import {
 } from 'lucide-react';
 
 export const Research: React.FC = () => {
+  const [researchTopics, setResearchTopics] = useState<ResearchTopic[]>(RESEARCH_TOPICS); // Initialize with constants as fallback
+
+  // Load research topics from Firestore
+  useEffect(() => {
+    const loadResearch = async () => {
+      try {
+        const researchSnapshot = await getDocs(collection(db, 'research'));
+        if (!researchSnapshot.empty) {
+          const loadedTopics: ResearchTopic[] = researchSnapshot.docs.map(doc => doc.data() as ResearchTopic);
+          setResearchTopics(loadedTopics);
+        }
+      } catch (error) {
+        console.error('Error loading research topics:', error);
+        // Keep default research topics on error
+      }
+    };
+    loadResearch();
+    
+    // Poll for updates every 10 seconds
+    const interval = setInterval(loadResearch, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="bg-white min-h-screen pt-32 pb-24 px-6 overflow-hidden">
       <div className="max-w-7xl mx-auto">
@@ -26,7 +52,7 @@ export const Research: React.FC = () => {
         </Reveal>
 
         <div className="space-y-12">
-          {RESEARCH_TOPICS.map((topic, idx) => (
+          {researchTopics.map((topic, idx) => (
             <Reveal key={topic.id} delay={idx * 0.05}>
               <div className="group grid lg:grid-cols-[1.5fr,2fr] gap-8 md:gap-16 items-start border-t border-slate-100 pt-16">
                 
