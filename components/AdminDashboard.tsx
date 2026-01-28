@@ -8,10 +8,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
-import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
 import { isAdminEmail } from '../utils/admin';
 import { getSettings, updateSettings } from '../utils/settings';
 import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS } from '../constants';
+import { initializeAllCollections, initializeAsanas, initializeResearch } from '../utils/initializeCollections';
 import { Asana, Instructor } from '../types';
 import { LoginModal, SignupModal } from './LoginModal';
 import { ProblemSolution } from './ProblemSolution';
@@ -358,10 +359,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     }
   };
 
+  // Helper function to save with timeout and retry
+  const saveWithRetry = async <T,>(
+    saveFn: () => Promise<T>,
+    operationName: string,
+    maxRetries: number = 3
+  ): Promise<T> => {
+    let lastError: any;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 ${operationName} - Attempt ${attempt}/${maxRetries}`);
+        
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Operation timed out after 30 seconds')), 30000);
+        });
+        
+        // Race between save and timeout
+        const result = await Promise.race([saveFn(), timeoutPromise]) as T;
+        
+        console.log(`✅ ${operationName} - Success on attempt ${attempt}`);
+        return result;
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`⚠️ ${operationName} - Attempt ${attempt} failed:`, error.message || error);
+        
+        if (attempt < maxRetries) {
+          // Wait before retry (exponential backoff)
+          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+    
+    throw lastError;
+  };
+
   // Handle asana save
   const handleSaveAsana = async (asana: Asana) => {
     try {
-      await setDoc(doc(db, 'asanas', asana.id), asana);
+      console.log('💾 Attempting to save asana:', {
+        id: asana.id,
+        sanskritName: asana.sanskritName,
+        englishName: asana.englishName,
+        hasBenefits: asana.benefits?.length > 0,
+        hasHowTo: asana.howTo?.length > 0,
+      });
+      
+      // Test connection first
+      try {
+        const testRef = doc(db, '_connection_test', 'test');
+        await getDoc(testRef);
+        console.log('✅ Firestore connection test passed');
+      } catch (testError: any) {
+        console.warn('⚠️ Connection test failed, but continuing:', testError.message);
+      }
+      
+      const asanaRef = doc(db, 'asanas', asana.id);
+      console.log('📝 Document reference created:', asanaRef.path);
+      
+      // Save with retry logic
+      await saveWithRetry(
+        () => setDoc(asanaRef, asana),
+        `Save asana ${asana.id}`
+      );
+      
+      console.log('✅ Asana saved successfully to Firestore:', asana.id);
+      
       setAsanas(prev => {
         const existing = prev.findIndex(a => a.id === asana.id);
         if (existing >= 0) {
@@ -373,10 +439,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       });
       setEditingAsana(null);
       setIsAsanaFormOpen(false);
-      console.log('✅ Asana saved:', asana.id);
-    } catch (error) {
+      
+      alert('Asana saved successfully!');
+    } catch (error: any) {
       console.error('❌ Error saving asana:', error);
-      alert('Failed to save asana. Please try again.');
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Error details:', error);
+      
+      let errorMessage = 'Failed to save asana. ';
+      if (error.message?.includes('timed out')) {
+        errorMessage += 'Request timed out. This might be a network issue or Firestore database configuration problem. ';
+        errorMessage += 'Please check: 1) Your internet connection, 2) Firebase Console to ensure Firestore is enabled, 3) Browser console for more details.';
+      } else if (error.code === 'permission-denied') {
+        errorMessage += 'Permission denied. Please check Firestore security rules are deployed.';
+      } else if (error.code === 'unavailable') {
+        errorMessage += 'Service unavailable. Please check your internet connection and Firebase project status.';
+      } else if (error.code === 'failed-precondition') {
+        errorMessage += 'Database error. Please check Firebase Console to ensure Firestore is in Native mode (not Datastore mode).';
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Please try again.';
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -408,7 +495,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         id: finalId,
       };
       
-      await setDoc(doc(db, 'instructors', finalId), finalInstructor);
+      console.log('💾 Attempting to save instructor:', {
+        id: finalId,
+        name: finalInstructor.name,
+        role: finalInstructor.role,
+        hasSpecialties: finalInstructor.specialties?.length > 0,
+      });
+      
+      // Test connection first
+      try {
+        const testRef = doc(db, '_connection_test', 'test');
+        await getDoc(testRef);
+        console.log('✅ Firestore connection test passed');
+      } catch (testError: any) {
+        console.warn('⚠️ Connection test failed, but continuing:', testError.message);
+      }
+      
+      const instructorRef = doc(db, 'instructors', finalId);
+      console.log('📝 Document reference created:', instructorRef.path);
+      
+      // Save with retry logic
+      await saveWithRetry(
+        () => setDoc(instructorRef, finalInstructor),
+        `Save instructor ${finalId}`
+      );
+      
+      console.log('✅ Instructor saved successfully to Firestore:', finalId);
+      
       setInstructors(prev => {
         const existing = prev.findIndex(i => i.id === finalId);
         if (existing >= 0) {
@@ -420,10 +533,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       });
       setEditingInstructor(null);
       setIsInstructorFormOpen(false);
-      console.log('✅ Instructor saved:', finalId);
-    } catch (error) {
+      
+      alert('Instructor saved successfully!');
+    } catch (error: any) {
       console.error('❌ Error saving instructor:', error);
-      alert('Failed to save instructor. Please try again.');
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Error details:', error);
+      
+      let errorMessage = 'Failed to save instructor. ';
+      if (error.message?.includes('timed out')) {
+        errorMessage += 'Request timed out. This might be a network issue or Firestore database configuration problem. ';
+        errorMessage += 'Please check: 1) Your internet connection, 2) Firebase Console to ensure Firestore is enabled, 3) Browser console for more details.';
+      } else if (error.code === 'permission-denied') {
+        errorMessage += 'Permission denied. Please check Firestore security rules are deployed.';
+      } else if (error.code === 'unavailable') {
+        errorMessage += 'Service unavailable. Please check your internet connection and Firebase project status.';
+      } else if (error.code === 'failed-precondition') {
+        errorMessage += 'Database error. Please check Firebase Console to ensure Firestore is in Native mode (not Datastore mode).';
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Please try again.';
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -1350,24 +1484,10 @@ interface AsanaFormModalProps {
 }
 
 const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose }) => {
-  const [formData, setFormData] = useState<Asana>(asana ? { ...asana } : {
-    id: '',
-    sanskritName: '',
-    englishName: '',
-    category: '',
-    level: 'Beginner',
-    description: '',
-    benefits: [''],
-    howTo: [''],
-    focusCue: '',
-    imageUrl: '',
-  });
-
-  useEffect(() => {
-    if (asana) {
-      setFormData({ ...asana });
-    } else {
-      setFormData({
+  // Helper to safely initialize form data with defaults for missing fields
+  const getInitialFormData = (asanaData: Asana | null): Asana => {
+    if (!asanaData) {
+      return {
         id: '',
         sanskritName: '',
         englishName: '',
@@ -1378,8 +1498,27 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
         howTo: [''],
         focusCue: '',
         imageUrl: '',
-      });
+      };
     }
+    
+    return {
+      id: asanaData.id || '',
+      sanskritName: asanaData.sanskritName || '',
+      englishName: asanaData.englishName || '',
+      category: asanaData.category || '',
+      level: asanaData.level || 'Beginner',
+      description: asanaData.description || '',
+      benefits: (asanaData.benefits && asanaData.benefits.length > 0) ? [...asanaData.benefits] : [''],
+      howTo: (asanaData.howTo && asanaData.howTo.length > 0) ? [...asanaData.howTo] : [''],
+      focusCue: asanaData.focusCue || '',
+      imageUrl: asanaData.imageUrl || '',
+    };
+  };
+
+  const [formData, setFormData] = useState<Asana>(getInitialFormData(asana));
+
+  useEffect(() => {
+    setFormData(getInitialFormData(asana));
   }, [asana]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1412,31 +1551,45 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
   };
 
   const addBenefit = () => {
-    setFormData({ ...formData, benefits: [...formData.benefits, ''] });
+    const currentBenefits = formData.benefits && formData.benefits.length > 0 ? formData.benefits : [''];
+    setFormData({ ...formData, benefits: [...currentBenefits, ''] });
   };
 
   const updateBenefit = (index: number, value: string) => {
-    const newBenefits = [...formData.benefits];
-    newBenefits[index] = value;
-    setFormData({ ...formData, benefits: newBenefits });
+    const currentBenefits = formData.benefits && formData.benefits.length > 0 ? [...formData.benefits] : [''];
+    if (index >= currentBenefits.length) {
+      currentBenefits.push('');
+    }
+    currentBenefits[index] = value;
+    setFormData({ ...formData, benefits: currentBenefits });
   };
 
   const removeBenefit = (index: number) => {
-    setFormData({ ...formData, benefits: formData.benefits.filter((_, i) => i !== index) });
+    const currentBenefits = formData.benefits && formData.benefits.length > 0 ? formData.benefits : [''];
+    const newBenefits = currentBenefits.filter((_, i) => i !== index);
+    // Ensure at least one benefit remains
+    setFormData({ ...formData, benefits: newBenefits.length > 0 ? newBenefits : [''] });
   };
 
   const addHowTo = () => {
-    setFormData({ ...formData, howTo: [...formData.howTo, ''] });
+    const currentHowTo = formData.howTo && formData.howTo.length > 0 ? formData.howTo : [''];
+    setFormData({ ...formData, howTo: [...currentHowTo, ''] });
   };
 
   const updateHowTo = (index: number, value: string) => {
-    const newHowTo = [...formData.howTo];
-    newHowTo[index] = value;
-    setFormData({ ...formData, howTo: newHowTo });
+    const currentHowTo = formData.howTo && formData.howTo.length > 0 ? [...formData.howTo] : [''];
+    if (index >= currentHowTo.length) {
+      currentHowTo.push('');
+    }
+    currentHowTo[index] = value;
+    setFormData({ ...formData, howTo: currentHowTo });
   };
 
   const removeHowTo = (index: number) => {
-    setFormData({ ...formData, howTo: formData.howTo.filter((_, i) => i !== index) });
+    const currentHowTo = formData.howTo && formData.howTo.length > 0 ? formData.howTo : [''];
+    const newHowTo = currentHowTo.filter((_, i) => i !== index);
+    // Ensure at least one step remains
+    setFormData({ ...formData, howTo: newHowTo.length > 0 ? newHowTo : [''] });
   };
 
   return (
@@ -1536,17 +1689,17 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Benefits *</label>
-            {formData.benefits.map((benefit, index) => (
+            {(formData.benefits && formData.benefits.length > 0 ? formData.benefits : ['']).map((benefit, index) => (
               <div key={index} className="flex gap-2 mb-2">
                 <input
                   type="text"
                   required
-                  value={benefit}
+                  value={benefit || ''}
                   onChange={(e) => updateBenefit(index, e.target.value)}
                   className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
                   placeholder={`Benefit ${index + 1}`}
                 />
-                {formData.benefits.length > 1 && (
+                {(formData.benefits?.length || 0) > 1 && (
                   <button
                     type="button"
                     onClick={() => removeBenefit(index)}
@@ -1569,17 +1722,17 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">How To Steps *</label>
-            {formData.howTo.map((step, index) => (
+            {(formData.howTo && formData.howTo.length > 0 ? formData.howTo : ['']).map((step, index) => (
               <div key={index} className="flex gap-2 mb-2">
                 <input
                   type="text"
                   required
-                  value={step}
+                  value={step || ''}
                   onChange={(e) => updateHowTo(index, e.target.value)}
                   className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
                   placeholder={`Step ${index + 1}`}
                 />
-                {formData.howTo.length > 1 && (
+                {(formData.howTo?.length || 0) > 1 && (
                   <button
                     type="button"
                     onClick={() => removeHowTo(index)}

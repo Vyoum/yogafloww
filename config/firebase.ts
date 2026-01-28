@@ -25,8 +25,26 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Initialize Cloud Firestore and get a reference to the service
+// Initialize Cloud Firestore with connection settings
 const db = getFirestore(app);
+
+// Configure Firestore settings for better timeout handling
+if (typeof window !== 'undefined') {
+  // Enable offline persistence (helps with timeouts)
+  import('firebase/firestore').then(({ enableIndexedDbPersistence }) => {
+    enableIndexedDbPersistence(db).catch((err: any) => {
+      if (err.code === 'failed-precondition') {
+        console.warn('⚠️ Multiple tabs open, persistence can only be enabled in one tab at a time.');
+      } else if (err.code === 'unimplemented') {
+        console.warn('⚠️ The current browser does not support all of the features required for persistence');
+      } else {
+        console.warn('⚠️ Firestore persistence error:', err);
+      }
+    });
+  }).catch(() => {
+    // Ignore if persistence is not available
+  });
+}
 
 // Debug: Log Firebase initialization and test connectivity
 if (typeof window !== 'undefined') {
