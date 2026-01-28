@@ -21,13 +21,15 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(true); // Default to showing overlay
   const [classVideos, setClassVideos] = useState<Record<string, string>>({}); // classId -> videoUrl
+  const [liveClasses, setLiveClasses] = useState<YogaClass[]>(LIVE_CLASSES);
+  const [recordedClasses, setRecordedClasses] = useState<YogaClass[]>(RECORDED_CLASSES);
 
   // Update activeTab when initialTab prop changes
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  // Load settings and videos
+  // Load settings, videos, and classes
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -46,6 +48,28 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
         });
         setClassVideos(videosMap);
         console.log('✅ Loaded class videos:', Object.keys(videosMap).length);
+
+        // Load classes from Firestore
+        const classesSnapshot = await getDocs(collection(db, 'classes'));
+        if (!classesSnapshot.empty) {
+          const allClasses = classesSnapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              return {
+                ...data,
+                category: data.category || (data.time ? 'live' : 'recorded'),
+              } as YogaClass & { category: 'live' | 'recorded' };
+            })
+            .filter(cls => !cls.deleted);
+          
+          const live = allClasses.filter(cls => cls.category === 'live').map(({ category, ...cls }) => cls);
+          const recorded = allClasses.filter(cls => cls.category === 'recorded').map(({ category, ...cls }) => cls);
+          
+          if (live.length > 0) setLiveClasses(live);
+          if (recorded.length > 0) setRecordedClasses(recorded);
+          
+          console.log(`✅ Loaded ${live.length} live classes and ${recorded.length} recorded classes from Firestore`);
+        }
       } catch (error) {
         console.error('Error loading data:', error);
         // Default to showing overlay on error
@@ -85,7 +109,7 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
   const levels = ['All Levels', 'Beginner', 'Intermediate', 'All'];
 
   const filteredClasses = useMemo(() => {
-    const source = activeTab === 'live' ? LIVE_CLASSES : RECORDED_CLASSES;
+    const source = activeTab === 'live' ? liveClasses : recordedClasses;
     return source.filter(cls => {
       const typeMatch = filterType === 'All Types' || cls.type === filterType;
       const levelMatch = filterLevel === 'All Levels' || cls.level === filterLevel;
@@ -95,7 +119,7 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
         cls.type.toLowerCase().includes(searchQuery.toLowerCase());
       return typeMatch && levelMatch && searchMatch;
     });
-  }, [activeTab, filterType, filterLevel, searchQuery]);
+  }, [activeTab, filterType, filterLevel, searchQuery, liveClasses, recordedClasses]);
 
   const clearFilters = () => {
     setFilterType('All Types');

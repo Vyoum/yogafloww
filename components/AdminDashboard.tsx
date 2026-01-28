@@ -12,8 +12,8 @@ import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestam
 import { isAdminEmail } from '../utils/admin';
 import { getSettings, updateSettings } from '../utils/settings';
 import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS, RESEARCH_TOPICS } from '../constants';
-import { initializeAllCollections, initializeAsanas, initializeResearch } from '../utils/initializeCollections';
-import { Asana, Instructor, ResearchTopic } from '../types';
+import { initializeAllCollections, initializeAsanas, initializeResearch, initializeClasses } from '../utils/initializeCollections';
+import { Asana, Instructor, ResearchTopic, YogaClass } from '../types';
 import { LoginModal, SignupModal } from './LoginModal';
 import { ProblemSolution } from './ProblemSolution';
 import { Timeline } from './Timeline';
@@ -327,6 +327,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         console.error('❌ Error loading research topics:', error);
         // Fallback to constants
         setResearchTopics(RESEARCH_TOPICS);
+      }
+
+      // Load classes from Firestore
+      try {
+        console.log('📅 Loading classes...');
+        const classesSnapshot = await getDocs(collection(db, 'classes'));
+        if (classesSnapshot.empty) {
+          // Initialize with default classes if empty
+          const defaultLiveClasses = LIVE_CLASSES.map(cls => ({ ...cls, category: 'live' as const }));
+          const defaultRecordedClasses = RECORDED_CLASSES.map(cls => ({ ...cls, category: 'recorded' as const }));
+          const allDefaultClasses = [...defaultLiveClasses, ...defaultRecordedClasses];
+          for (const cls of allDefaultClasses) {
+            await setDoc(doc(db, 'classes', cls.id), cls);
+          }
+          setClasses(allDefaultClasses);
+          console.log('✅ Initialized classes with defaults');
+        } else {
+          const loadedClasses: (YogaClass & { category: 'live' | 'recorded' })[] = classesSnapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              return {
+                ...data,
+                category: data.category || (data.time ? 'live' : 'recorded'),
+              } as YogaClass & { category: 'live' | 'recorded' };
+            })
+            .filter(cls => !cls.deleted);
+          setClasses(loadedClasses);
+          console.log(`✅ Loaded ${loadedClasses.length} classes`);
+        }
+      } catch (error: any) {
+        console.error('❌ Error loading classes:', error);
+        // Fallback to constants
+        const fallbackLive = LIVE_CLASSES.map(cls => ({ ...cls, category: 'live' as const }));
+        const fallbackRecorded = RECORDED_CLASSES.map(cls => ({ ...cls, category: 'recorded' as const }));
+        setClasses([...fallbackLive, ...fallbackRecorded]);
       }
       
       console.log('✅ Admin data loading complete');
@@ -1338,6 +1373,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-slate-900">Classes Management</h2>
+                    <button
+                      onClick={() => {
+                        setEditingClass(null);
+                        setIsClassFormOpen(true);
+                      }}
+                      className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                      <Plus size={18} />
+                      <span>Add New Class</span>
+                    </button>
                   </div>
 
                   {/* Coming Soon Toggle */}
@@ -1384,11 +1429,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       <p className="text-sm text-slate-600 mt-1">Upload video URLs for live classes</p>
                     </div>
                     <div className="divide-y divide-slate-200">
-                      {LIVE_CLASSES.map((cls) => (
+                      {(classes.filter(c => c.category === 'live').length > 0 
+                        ? classes.filter(c => c.category === 'live')
+                        : LIVE_CLASSES.map(cls => ({ ...cls, category: 'live' as const }))
+                      ).map((cls) => (
                         <div key={cls.id} className="p-6 hover:bg-slate-50">
                           <div className="flex items-start justify-between gap-6">
                             <div className="flex-1">
-                              <h4 className="font-bold text-slate-900 mb-1">{cls.title}</h4>
+                              <div className="flex items-center gap-3 mb-2">
+                                <h4 className="font-bold text-slate-900">{cls.title}</h4>
+                                <button
+                                  onClick={() => {
+                                    setEditingClass({ ...cls });
+                                    setIsClassFormOpen(true);
+                                  }}
+                                  className="px-2 py-1 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 transition-colors flex items-center gap-1"
+                                >
+                                  <Edit size={12} />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteClass(cls.id)}
+                                  className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 transition-colors flex items-center gap-1"
+                                >
+                                  <Trash2 size={12} />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
                               <div className="flex flex-wrap gap-2 text-xs text-slate-600">
                                 <span>{cls.instructor}</span>
                                 <span>•</span>
@@ -1396,7 +1463,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                                 <span>•</span>
                                 <span>{cls.level}</span>
                                 <span>•</span>
-                                <span>{cls.time}</span>
+                                <span>{cls.time || cls.duration}</span>
                               </div>
                               {classesWithVideos[cls.id] && (
                                 <div className="mt-3 p-3 bg-teal-50 border border-teal-200 rounded-lg">
@@ -1424,18 +1491,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     </div>
                   </div>
 
-                  {/* Recorded Classes Video Management */}
+                  {/* Recorded Classes Management */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-6 border-b border-slate-200">
-                      <h3 className="text-lg font-bold text-slate-900">Recorded Classes (Archives) - Video Upload</h3>
-                      <p className="text-sm text-slate-600 mt-1">Upload video URLs for archived classes</p>
+                      <h3 className="text-lg font-bold text-slate-900">Recorded Classes (Archives)</h3>
+                      <p className="text-sm text-slate-600 mt-1">Manage recorded classes and upload video URLs</p>
                     </div>
                     <div className="divide-y divide-slate-200">
-                      {RECORDED_CLASSES.map((cls) => (
+                      {(classes.filter(c => c.category === 'recorded').length > 0 
+                        ? classes.filter(c => c.category === 'recorded')
+                        : RECORDED_CLASSES.map(cls => ({ ...cls, category: 'recorded' as const }))
+                      ).map((cls) => (
                         <div key={cls.id} className="p-6 hover:bg-slate-50">
                           <div className="flex items-start justify-between gap-6">
                             <div className="flex-1">
-                              <h4 className="font-bold text-slate-900 mb-1">{cls.title}</h4>
+                              <div className="flex items-center gap-3 mb-2">
+                                <h4 className="font-bold text-slate-900">{cls.title}</h4>
+                                <button
+                                  onClick={() => {
+                                    setEditingClass({ ...cls });
+                                    setIsClassFormOpen(true);
+                                  }}
+                                  className="px-2 py-1 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 transition-colors flex items-center gap-1"
+                                >
+                                  <Edit size={12} />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteClass(cls.id)}
+                                  className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 transition-colors flex items-center gap-1"
+                                >
+                                  <Trash2 size={12} />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
                               <div className="flex flex-wrap gap-2 text-xs text-slate-600">
                                 <span>{cls.instructor}</span>
                                 <span>•</span>
@@ -1633,6 +1722,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           onClose={() => {
             setIsResearchFormOpen(false);
             setEditingResearch(null);
+          }}
+        />
+      )}
+
+      {/* Class Form Modal */}
+      {isClassFormOpen && (
+        <ClassFormModal
+          classData={editingClass}
+          onSave={handleSaveClass}
+          onClose={() => {
+            setIsClassFormOpen(false);
+            setEditingClass(null);
           }}
         />
       )}

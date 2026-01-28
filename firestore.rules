@@ -106,6 +106,15 @@ service cloud.firestore {
       allow delete: if true;
     }
     
+    // Classes Collection - PERMISSIVE FOR TESTING
+    match /classes/{documentId} {
+      // Anyone can read/write for now
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+    
     // App Settings Collection - PERMISSIVE FOR TESTING
     match /app_settings/{documentId} {
       // Anyone can read/write for now

@@ -1,8 +1,8 @@
 // Utility to initialize Firestore collections with default data
 import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { ASANAS, RESEARCH_TOPICS } from '../constants';
-import { Asana, ResearchTopic } from '../types';
+import { ASANAS, RESEARCH_TOPICS, LIVE_CLASSES, RECORDED_CLASSES } from '../constants';
+import { Asana, ResearchTopic, YogaClass } from '../types';
 
 /**
  * Initialize asanas collection with default data
@@ -91,6 +91,55 @@ export const initializeResearch = async (): Promise<{ added: number; skipped: nu
 };
 
 /**
+ * Initialize classes collection with default data
+ * Only adds classes that don't already exist
+ */
+export const initializeClasses = async (): Promise<{ added: number; skipped: number }> => {
+  try {
+    console.log('📅 Initializing classes collection...');
+    
+    // Get existing classes
+    const existingSnapshot = await getDocs(collection(db, 'classes'));
+    const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
+    
+    let added = 0;
+    let skipped = 0;
+    
+    // Combine live and recorded classes with category field
+    const allClasses: (YogaClass & { category: 'live' | 'recorded' })[] = [
+      ...LIVE_CLASSES.map(cls => ({ ...cls, category: 'live' as const })),
+      ...RECORDED_CLASSES.map(cls => ({ ...cls, category: 'recorded' as const })),
+    ];
+    
+    // Add each class if it doesn't exist
+    for (const cls of allClasses) {
+      if (existingIds.has(cls.id)) {
+        console.log(`⏭️  Skipping ${cls.title} (already exists)`);
+        skipped++;
+        continue;
+      }
+      
+      try {
+        await setDoc(doc(db, 'classes', cls.id), {
+          ...cls,
+          createdAt: new Date().toISOString(),
+        });
+        console.log(`✅ Added class: ${cls.title} (${cls.id})`);
+        added++;
+      } catch (error: any) {
+        console.error(`❌ Error adding class ${cls.id}:`, error);
+      }
+    }
+    
+    console.log(`✅ Classes initialization complete: ${added} added, ${skipped} skipped`);
+    return { added, skipped };
+  } catch (error: any) {
+    console.error('❌ Error initializing classes:', error);
+    throw error;
+  }
+};
+
+/**
  * Initialize both asanas and research collections
  */
 export const initializeAllCollections = async (): Promise<void> => {
@@ -99,10 +148,12 @@ export const initializeAllCollections = async (): Promise<void> => {
     
     const asanasResult = await initializeAsanas();
     const researchResult = await initializeResearch();
+    const classesResult = await initializeClasses();
     
     console.log('✅ All collections initialized:');
     console.log(`   - Asanas: ${asanasResult.added} added, ${asanasResult.skipped} skipped`);
     console.log(`   - Research: ${researchResult.added} added, ${researchResult.skipped} skipped`);
+    console.log(`   - Classes: ${classesResult.added} added, ${classesResult.skipped} skipped`);
     
     return Promise.resolve();
   } catch (error: any) {
