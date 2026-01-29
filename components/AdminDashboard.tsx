@@ -75,6 +75,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [classesComingSoon, setClassesComingSoon] = useState(true);
   const [classesWithVideos, setClassesWithVideos] = useState<Record<string, string>>({}); // classId -> videoUrl
   const [uploadingVideo, setUploadingVideo] = useState<string | null>(null);
+  const [classes, setClasses] = useState<(YogaClass & { category: 'live' | 'recorded' })[]>([]);
+  const [editingClass, setEditingClass] = useState<(YogaClass & { category: 'live' | 'recorded' }) | null>(null);
+  const [isClassFormOpen, setIsClassFormOpen] = useState(false);
   
   // Asanas management state
   const [asanas, setAsanas] = useState<Asana[]>([]);
