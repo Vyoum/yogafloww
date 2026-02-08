@@ -91,6 +91,10 @@ service cloud.firestore {
     match /classes/{documentId} {
       allow read, write: if true;
     }
+
+    match /subscription/{documentId} {
+      allow read, write: if true;
+    }
     
     match /app_settings/{documentId} {
       allow read, write: if true;

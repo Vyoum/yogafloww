@@ -9,18 +9,69 @@ import { Reveal } from './Reveal';
 import { initiateRazorpayPayment } from '../utils/razorpay';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginModal, SignupModal } from './LoginModal';
+import { db } from '../config/firebase';
+import { doc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 
 interface PricingProps {
   onShowLogin?: () => void;
 }
 
 export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
   const [pendingPurchase, setPendingPurchase] = useState<PricingTier | null>(null);
   const [isIndia, setIsIndia] = useState<boolean>(true);
   const [showCurrencyToggle, setShowCurrencyToggle] = useState<boolean>(false);
+
+  const getCurrentPeriodEnd = (tier: PricingTier): Date => {
+    const now = new Date();
+    const frequency = (tier.frequency || '').toLowerCase();
+    const name = (tier.name || '').toLowerCase();
+    const end = new Date(now);
+    if (frequency.includes('month') || frequency === '/month') {
+      end.setMonth(end.getMonth() + 1);
+      return end;
+    }
+    if (name.includes('6 month') || frequency.includes('6')) {
+      end.setMonth(end.getMonth() + 6);
+      return end;
+    }
+    end.setMonth(end.getMonth() + 6);
+    return end;
+  };
+
+  const saveSubscription = async (tier: PricingTier, paymentResponse: any) => {
+    if (!user?.id) return;
+    const currentPeriodEnd = getCurrentPeriodEnd(tier);
+    const subscriptionRef = doc(db, 'subscription', user.id);
+    await setDoc(subscriptionRef, {
+      id: user.id,
+      planType: tier.name,
+      status: 'active',
+      currentPeriodEnd: Timestamp.fromDate(currentPeriodEnd),
+      paymentId: paymentResponse?.razorpay_payment_id ?? null,
+      planFrequency: tier.frequency ?? null,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    }, { merge: true });
+
+    const userRef = doc(db, 'users', user.id);
+    await setDoc(userRef, {
+      plan: tier.name,
+      planStatus: 'active',
+      planCurrentPeriodEnd: Timestamp.fromDate(currentPeriodEnd),
+      planUpdatedAt: serverTimestamp(),
+    }, { merge: true });
+  };
+
+  const handlePaymentSuccess = (tier: PricingTier, response: any) => {
+    console.log('Payment successful:', response);
+    saveSubscription(tier, response).catch((error) => {
+      console.error('Error saving subscription:', error);
+    });
+    alert(`Payment successful! Welcome to ${tier.name}. Your payment ID: ${response.razorpay_payment_id}`);
+  };
 
   // Detect user location on component mount
   useEffect(() => {
@@ -80,9 +131,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
               tier.name,
               tier.frequency,
               (response) => {
-                // Payment successful
-                console.log('Payment successful:', response);
-                alert(`Payment successful! Welcome to ${tier.name}. Your payment ID: ${response.razorpay_payment_id}`);
+                handlePaymentSuccess(tier, response);
                 setPendingPurchase(null);
                 // Here you would typically redirect to a success page or update user status
               },
@@ -135,9 +184,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
       tier.name,
       tier.frequency,
       (response) => {
-        // Payment successful
-        console.log('Payment successful:', response);
-        alert(`Payment successful! Welcome to ${tier.name}. Your payment ID: ${response.razorpay_payment_id}`);
+        handlePaymentSuccess(tier, response);
         // Here you would typically redirect to a success page or update user status
       },
       (error) => {
