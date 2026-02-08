@@ -3,7 +3,7 @@ import { Reveal } from './Reveal';
 import { RESEARCH_TOPICS } from '../constants';
 import { ResearchTopic } from '../types';
 import { db } from '../config/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { 
   BookOpen, 
   ExternalLink, 
@@ -15,25 +15,17 @@ import {
 export const Research: React.FC = () => {
   const [researchTopics, setResearchTopics] = useState<ResearchTopic[]>(RESEARCH_TOPICS); // Initialize with constants as fallback
 
-  // Load research topics from Firestore
   useEffect(() => {
-    const loadResearch = async () => {
-      try {
-        const researchSnapshot = await getDocs(collection(db, 'research'));
-        if (!researchSnapshot.empty) {
-          const loadedTopics: ResearchTopic[] = researchSnapshot.docs.map(doc => doc.data() as ResearchTopic);
-          setResearchTopics(loadedTopics);
-        }
-      } catch (error) {
-        console.error('Error loading research topics:', error);
-        // Keep default research topics on error
-      }
-    };
-    loadResearch();
-    
-    // Poll for updates every 10 seconds
-    const interval = setInterval(loadResearch, 10000);
-    return () => clearInterval(interval);
+    const ref = collection(db, 'research');
+    const unsubscribe = onSnapshot(ref, (snapshot) => {
+      const loadedTopics: ResearchTopic[] = snapshot.docs
+        .map(doc => doc.data() as ResearchTopic)
+        .filter(topic => !(topic as any).deleted);
+      setResearchTopics(loadedTopics);
+    }, (error) => {
+      console.error('Error loading research topics:', error);
+    });
+    return () => unsubscribe();
   }, []);
 
   return (

@@ -69,59 +69,31 @@ service cloud.firestore {
     
     // Settings Collection - PERMISSIVE FOR TESTING
     match /settings/{documentId} {
-      // Anyone can read/write settings for now
       allow read, write: if true;
     }
     
-    // Class Videos Collection - PERMISSIVE FOR TESTING
     match /class_videos/{documentId} {
-      // Anyone can read/write for now
       allow read, write: if true;
     }
     
-    // Asanas Collection - PERMISSIVE FOR TESTING
     match /asanas/{documentId} {
-      // Anyone can read/write for now
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read, write: if true;
     }
     
-    // Instructors Collection - PERMISSIVE FOR TESTING
     match /instructors/{documentId} {
-      // Anyone can read/write for now
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read, write: if true;
     }
     
-    // Research Collection - PERMISSIVE FOR TESTING
     match /research/{documentId} {
-      // Anyone can read/write for now
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read, write: if true;
     }
     
-    // Classes Collection - PERMISSIVE FOR TESTING
     match /classes/{documentId} {
-      // Anyone can read/write for now
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read, write: if true;
     }
     
-    // App Settings Collection - PERMISSIVE FOR TESTING
     match /app_settings/{documentId} {
-      // Anyone can read/write for now
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow read, write: if true;
     }
     
     // Default deny rule for any other collections

@@ -6,7 +6,7 @@ import { Clock, Play, ExternalLink, Filter, ChevronDown, Calendar, Search, X, Sp
 import { YogaClass } from '../types';
 import { getSettings } from '../utils/settings';
 import { db } from '../config/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 interface ClassesProps {
   initialTab?: 'live' | 'recorded';
@@ -29,58 +29,53 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  // Load settings, videos, and classes
   useEffect(() => {
-    const loadData = async () => {
+    let unsubVideos: (() => void) | null = null;
+    let unsubClasses: (() => void) | null = null;
+    (async () => {
       try {
-        // Load settings
         const settings = await getSettings();
         setShowComingSoon(settings.classesComingSoon);
-        
-        // Load class videos
-        const videosSnapshot = await getDocs(collection(db, 'class_videos'));
-        const videosMap: Record<string, string> = {};
-        videosSnapshot.docs.forEach(doc => {
-          const data = doc.data();
-          if (data.classId && data.videoUrl) {
-            videosMap[data.classId] = data.videoUrl;
-          }
-        });
-        setClassVideos(videosMap);
-        console.log('✅ Loaded class videos:', Object.keys(videosMap).length);
-
-        // Load classes from Firestore
-        const classesSnapshot = await getDocs(collection(db, 'classes'));
-        if (!classesSnapshot.empty) {
-          const allClasses = classesSnapshot.docs
-            .map(doc => {
-              const data = doc.data();
-              return {
-                ...data,
-                category: data.category || (data.time ? 'live' : 'recorded'),
-              } as YogaClass & { category: 'live' | 'recorded' };
-            })
-            .filter(cls => !cls.deleted);
-          
-          const live = allClasses.filter(cls => cls.category === 'live').map(({ category, ...cls }) => cls);
-          const recorded = allClasses.filter(cls => cls.category === 'recorded').map(({ category, ...cls }) => cls);
-          
-          if (live.length > 0) setLiveClasses(live);
-          if (recorded.length > 0) setRecordedClasses(recorded);
-          
-          console.log(`✅ Loaded ${live.length} live classes and ${recorded.length} recorded classes from Firestore`);
-        }
       } catch (error) {
-        console.error('Error loading data:', error);
-        // Default to showing overlay on error
+        console.error('Error loading settings:', error);
         setShowComingSoon(true);
       }
+      const videosRef = collection(db, 'class_videos');
+      unsubVideos = onSnapshot(videosRef, (snapshot) => {
+        const map: Record<string, string> = {};
+        snapshot.docs.forEach(doc => {
+          const data = doc.data() as any;
+          if (data.classId && data.videoUrl) {
+            map[data.classId] = data.videoUrl;
+          }
+        });
+        setClassVideos(map);
+      }, (error) => {
+        console.error('Error loading class videos:', error);
+      });
+      const classesRef = collection(db, 'classes');
+      unsubClasses = onSnapshot(classesRef, (snapshot) => {
+        const allClasses = snapshot.docs
+          .map(doc => {
+            const data = doc.data() as any;
+            return {
+              ...data,
+              category: data.category || (data.time ? 'live' : 'recorded'),
+            } as YogaClass & { category: 'live' | 'recorded' };
+          })
+          .filter(cls => !(cls as any).deleted);
+        const live = allClasses.filter(cls => cls.category === 'live').map(({ category, ...cls }) => cls);
+        const recorded = allClasses.filter(cls => cls.category === 'recorded').map(({ category, ...cls }) => cls);
+        setLiveClasses(live);
+        setRecordedClasses(recorded);
+      }, (error) => {
+        console.error('Error loading classes:', error);
+      });
+    })();
+    return () => {
+      if (unsubVideos) unsubVideos();
+      if (unsubClasses) unsubClasses();
     };
-    loadData();
-
-    // Listen for changes (poll every 5 seconds)
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleJoinJourney = () => {

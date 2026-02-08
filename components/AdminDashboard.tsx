@@ -98,6 +98,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const isAdmin = true; // Always true for now
   const isAuthenticated = true; // Always true for now
 
+  const sanitizeForFirestore = (value: any): any => {
+    if (Array.isArray(value)) {
+      return value
+        .filter((v) => v !== undefined)
+        .map((v) => sanitizeForFirestore(v));
+    }
+    if (value && typeof value === 'object') {
+      const result: any = {};
+      Object.entries(value).forEach(([k, v]) => {
+        if (v === undefined) return;
+        const sv = sanitizeForFirestore(v);
+        if (sv !== undefined) result[k] = sv;
+      });
+      return result;
+    }
+    return value;
+  };
+
   useEffect(() => {
     // Load data immediately without auth check
     console.log('✅ Loading admin data (no auth required)...');
@@ -583,7 +601,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       
       // Save with retry logic
       await saveWithRetry(
-        () => setDoc(instructorRef, finalInstructor),
+        () => setDoc(instructorRef, sanitizeForFirestore(finalInstructor)),
         `Save instructor ${finalId}`
       );
       

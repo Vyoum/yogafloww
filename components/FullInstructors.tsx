@@ -1,9 +1,12 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { INSTRUCTORS } from '../constants';
 import { Button } from './Button';
 import { ArrowLeft, Award, BookOpen, Star, Instagram, Youtube, MapPin } from 'lucide-react';
 import { Reveal } from './Reveal';
+import { Instructor } from '../types';
+import { db } from '../config/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 interface FullInstructorsProps {
   onBack: () => void;
@@ -11,9 +14,24 @@ interface FullInstructorsProps {
 }
 
 export const FullInstructors: React.FC<FullInstructorsProps> = ({ onBack, selectedId }) => {
+  const [instructors, setInstructors] = useState<Instructor[]>(INSTRUCTORS);
+
+  useEffect(() => {
+    const ref = collection(db, 'instructors');
+    const unsubscribe = onSnapshot(ref, (snapshot) => {
+      const loaded: Instructor[] = snapshot.docs
+        .map(doc => doc.data() as Instructor)
+        .filter(i => !(i as any).deleted);
+      setInstructors(loaded.length > 0 ? loaded : INSTRUCTORS);
+    }, (error) => {
+      console.error('Error loading instructors:', error);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const displayInstructors = selectedId 
-    ? INSTRUCTORS.filter(i => i.id === selectedId)
-    : INSTRUCTORS;
+    ? instructors.filter(i => i.id === selectedId)
+    : instructors;
 
   return (
     <div className="bg-white min-h-screen pt-32 pb-24 px-6">

@@ -5,7 +5,7 @@ import { Reveal } from './Reveal';
 import { ASANAS, MEDITATION_TRACKS } from '../constants';
 import { Track, Asana } from '../types';
 import { db } from '../config/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { 
   Shield, 
   Sparkles, 
@@ -44,25 +44,17 @@ export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
     }
   }, [isAuthenticated, shouldNavigateToPricing, onNavPricing]);
 
-  // Load asanas from Firestore
   useEffect(() => {
-    const loadAsanas = async () => {
-      try {
-        const asanasSnapshot = await getDocs(collection(db, 'asanas'));
-        if (!asanasSnapshot.empty) {
-          const loadedAsanas: Asana[] = asanasSnapshot.docs.map(doc => doc.data() as Asana);
-          setAsanas(loadedAsanas);
-        }
-      } catch (error) {
-        console.error('Error loading asanas:', error);
-        // Keep default asanas on error
-      }
-    };
-    loadAsanas();
-    
-    // Poll for updates every 10 seconds
-    const interval = setInterval(loadAsanas, 10000);
-    return () => clearInterval(interval);
+    const ref = collection(db, 'asanas');
+    const unsubscribe = onSnapshot(ref, (snapshot) => {
+      const loadedAsanas: Asana[] = snapshot.docs
+        .map(doc => doc.data() as Asana)
+        .filter(asana => !(asana as any).deleted);
+      setAsanas(loadedAsanas);
+    }, (error) => {
+      console.error('Error loading asanas:', error);
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleJoinWorkshop = () => {

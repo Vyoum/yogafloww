@@ -6,7 +6,7 @@ import { Award, ShieldCheck, ChevronRight } from 'lucide-react';
 import { Reveal } from './Reveal';
 import { Instructor } from '../types';
 import { db } from '../config/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 interface InstructorsProps {
   onViewProfile?: (id: string) => void;
@@ -15,25 +15,17 @@ interface InstructorsProps {
 export const Instructors: React.FC<InstructorsProps> = ({ onViewProfile }) => {
   const [instructors, setInstructors] = useState<Instructor[]>(INSTRUCTORS);
 
-  // Load instructors from Firestore
   useEffect(() => {
-    const loadInstructors = async () => {
-      try {
-        const instructorsSnapshot = await getDocs(collection(db, 'instructors'));
-        if (!instructorsSnapshot.empty) {
-          const loadedInstructors: Instructor[] = instructorsSnapshot.docs.map(doc => doc.data() as Instructor);
-          setInstructors(loadedInstructors);
-        }
-      } catch (error) {
-        console.error('Error loading instructors:', error);
-        // Keep default instructors on error
-      }
-    };
-    loadInstructors();
-    
-    // Poll for updates every 10 seconds
-    const interval = setInterval(loadInstructors, 10000);
-    return () => clearInterval(interval);
+    const ref = collection(db, 'instructors');
+    const unsubscribe = onSnapshot(ref, (snapshot) => {
+      const loadedInstructors: Instructor[] = snapshot.docs
+        .map(doc => doc.data() as Instructor)
+        .filter(instructor => !(instructor as any).deleted);
+      setInstructors(loadedInstructors);
+    }, (error) => {
+      console.error('Error loading instructors:', error);
+    });
+    return () => unsubscribe();
   }, []);
 
   return (
