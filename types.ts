@@ -38,6 +38,7 @@ export interface YogaClass {
   time?: string;
   type: 'Hatha' | 'Vinyasa' | 'Meditation' | 'Mobility';
   focus: string[];
+  deleted?: boolean;
 }
 
 export interface Track {
@@ -68,6 +69,7 @@ export interface Instructor {
   education: string[];
   achievements?: string[];
   experience?: string[];
+  deleted?: boolean;
 }
 
 export interface PricingTier {
@@ -90,6 +92,7 @@ export interface Asana {
   howTo: string[];
   focusCue: string;
   imageUrl?: string;
+  deleted?: boolean;
 }
 
 export interface ResearchPaper {

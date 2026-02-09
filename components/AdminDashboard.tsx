@@ -59,6 +59,8 @@ interface NewsletterSubscriber {
 
 type TabType = 'overview' | 'users' | 'journey' | 'asanas' | 'classes' | 'classes-manage' | 'instructors' | 'instructors-manage' | 'community' | 'pricing' | 'meditation' | 'research' | 'contact' | 'newsletter';
 
+type ManagedYogaClass = YogaClass & { category: 'live' | 'recorded' };
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -75,8 +77,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [classesComingSoon, setClassesComingSoon] = useState(true);
   const [classesWithVideos, setClassesWithVideos] = useState<Record<string, string>>({}); // classId -> videoUrl
   const [uploadingVideo, setUploadingVideo] = useState<string | null>(null);
-  const [classes, setClasses] = useState<(YogaClass & { category: 'live' | 'recorded' })[]>([]);
-  const [editingClass, setEditingClass] = useState<(YogaClass & { category: 'live' | 'recorded' }) | null>(null);
+  const [classes, setClasses] = useState<ManagedYogaClass[]>([]);
+  const [editingClass, setEditingClass] = useState<ManagedYogaClass | null>(null);
   const [isClassFormOpen, setIsClassFormOpen] = useState(false);
   
   // Asanas management state
@@ -480,6 +482,84 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     }
     
     throw lastError;
+  };
+
+  const handleSaveClass = async (cls: ManagedYogaClass) => {
+    try {
+      let finalId = cls.id;
+      if (!finalId || finalId === '') {
+        finalId = cls.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      }
+
+      const cleanFocus = (cls.focus || []).filter(f => f.trim() !== '');
+      if (cleanFocus.length === 0) {
+        alert('Please add at least one focus item.');
+        return;
+      }
+
+      if (cls.category === 'live' && (!cls.time || cls.time.trim() === '')) {
+        alert('Please add a time for live classes.');
+        return;
+      }
+
+      const finalClass: ManagedYogaClass = {
+        ...cls,
+        id: finalId,
+        focus: cleanFocus,
+        time: cls.category === 'live' ? (cls.time || '').trim() : undefined,
+      };
+
+      const classRef = doc(db, 'classes', finalId);
+      await saveWithRetry(
+        () => setDoc(classRef, sanitizeForFirestore(finalClass), { merge: true }),
+        `Save class ${finalId}`
+      );
+
+      setClasses(prev => {
+        const existing = prev.findIndex(c => c.id === finalId);
+        if (existing >= 0) {
+          const updated = [...prev];
+          updated[existing] = finalClass;
+          return updated;
+        }
+        return [...prev, finalClass];
+      });
+
+      setEditingClass(null);
+      setIsClassFormOpen(false);
+      alert('Class saved successfully!');
+    } catch (error: any) {
+      console.error('❌ Error saving class:', error);
+      let errorMessage = 'Failed to save class. ';
+      if (error.code === 'permission-denied') {
+        errorMessage += 'Permission denied. Please check Firestore security rules are deployed.';
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Please try again.';
+      }
+      alert(errorMessage);
+    }
+  };
+
+  const handleDeleteClass = async (classId: string) => {
+    if (!confirm('Are you sure you want to delete this class?')) return;
+    try {
+      await saveWithRetry(
+        () => setDoc(doc(db, 'classes', classId), { deleted: true }, { merge: true }),
+        `Delete class ${classId}`
+      );
+      setClasses(prev => prev.filter(c => c.id !== classId));
+      setClassesWithVideos(prev => {
+        const next = { ...prev };
+        delete next[classId];
+        return next;
+      });
+      console.log('✅ Class deleted:', classId);
+    } catch (error) {
+      console.error('❌ Error deleting class:', error);
+      alert('Failed to delete class. Please try again.');
+    }
   };
 
   // Handle asana save
@@ -2681,6 +2761,275 @@ const ResearchFormModal: React.FC<ResearchFormModalProps> = ({ topic, onSave, on
               className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
             >
               {topic ? 'Update' : 'Create'} Research Topic
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Class Form Modal Component
+interface ClassFormModalProps {
+  classData: ManagedYogaClass | null;
+  onSave: (cls: ManagedYogaClass) => void;
+  onClose: () => void;
+}
+
+const ClassFormModal: React.FC<ClassFormModalProps> = ({ classData, onSave, onClose }) => {
+  const getInitialFormData = (data: ManagedYogaClass | null): ManagedYogaClass => {
+    if (!data) {
+      return {
+        id: '',
+        title: '',
+        instructor: '',
+        level: 'Beginner',
+        duration: '',
+        time: '',
+        type: 'Hatha',
+        focus: [''],
+        category: 'live',
+      };
+    }
+
+    const focus = (data.focus && data.focus.length > 0) ? [...data.focus] : [''];
+    const isLive = data.category === 'live';
+
+    return {
+      id: data.id || '',
+      title: data.title || '',
+      instructor: data.instructor || '',
+      level: data.level || 'Beginner',
+      duration: data.duration || '',
+      time: isLive ? (data.time || '') : undefined,
+      type: data.type || 'Hatha',
+      focus,
+      category: data.category || 'live',
+    };
+  };
+
+  const [formData, setFormData] = useState<ManagedYogaClass>(getInitialFormData(classData));
+
+  useEffect(() => {
+    setFormData(getInitialFormData(classData));
+  }, [classData]);
+
+  const addFocus = () => {
+    setFormData({ ...formData, focus: [...(formData.focus || ['']), ''] });
+  };
+
+  const updateFocus = (index: number, value: string) => {
+    const next = [...(formData.focus || [''])];
+    next[index] = value;
+    setFormData({ ...formData, focus: next });
+  };
+
+  const removeFocus = (index: number) => {
+    const next = (formData.focus || ['']).filter((_, i) => i !== index);
+    setFormData({ ...formData, focus: next.length > 0 ? next : [''] });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const cleanFocus = (formData.focus || []).filter(f => f.trim() !== '');
+    if (cleanFocus.length === 0) {
+      alert('Please add at least one focus item.');
+      return;
+    }
+
+    if (formData.category === 'live' && (!formData.time || formData.time.trim() === '')) {
+      alert('Please add a time for live classes.');
+      return;
+    }
+
+    let finalId = formData.id;
+    if (!finalId || finalId === '') {
+      finalId = formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    const finalClass: ManagedYogaClass = {
+      ...formData,
+      id: finalId,
+      focus: cleanFocus,
+      time: formData.category === 'live' ? (formData.time || '').trim() : undefined,
+    };
+
+    onSave(finalClass);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto m-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 className="text-2xl font-bold text-slate-900">
+            {classData ? 'Edit Class' : 'Add New Class'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-lg"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Category *</label>
+              <select
+                value={formData.category}
+                onChange={(e) => {
+                  const category = e.target.value as ManagedYogaClass['category'];
+                  setFormData({
+                    ...formData,
+                    category,
+                    time: category === 'live' ? (formData.time || '') : undefined,
+                  });
+                }}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="live">Live</option>
+                <option value="recorded">Recorded</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Level *</label>
+              <select
+                value={formData.level}
+                onChange={(e) => setFormData({ ...formData, level: e.target.value as YogaClass['level'] })}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="All">All</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Title *</label>
+            <input
+              type="text"
+              required
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Instructor *</label>
+              <input
+                type="text"
+                required
+                value={formData.instructor}
+                onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Type *</label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as YogaClass['type'] })}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="Hatha">Hatha</option>
+                <option value="Vinyasa">Vinyasa</option>
+                <option value="Meditation">Meditation</option>
+                <option value="Mobility">Mobility</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                {formData.category === 'live' ? 'Duration (optional)' : 'Duration *'}
+              </label>
+              <input
+                type="text"
+                required={formData.category !== 'live'}
+                value={formData.duration}
+                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                placeholder="e.g., 45 min"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                {formData.category === 'live' ? 'Time *' : 'Time (not used)'}
+              </label>
+              <input
+                type="text"
+                required={formData.category === 'live'}
+                value={formData.category === 'live' ? (formData.time || '') : ''}
+                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                placeholder="e.g., Mon/Wed/Fri 6:00 AM"
+                disabled={formData.category !== 'live'}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Focus *</label>
+            {(formData.focus && formData.focus.length > 0 ? formData.focus : ['']).map((focus, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  required={index === 0}
+                  value={focus}
+                  onChange={(e) => updateFocus(index, e.target.value)}
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  placeholder={`Focus ${index + 1}`}
+                />
+                {(formData.focus?.length || 0) > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeFocus(index)}
+                    className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addFocus}
+              className="mt-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Focus
+            </button>
+          </div>
+
+          <div className="flex justify-end gap-4 pt-4 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+            >
+              {classData ? 'Update' : 'Create'} Class
             </button>
           </div>
         </form>
