@@ -3092,9 +3092,60 @@ const ClassFormModal: React.FC<ClassFormModalProps> = ({ classData, instructors,
   const [formData, setFormData] = useState<ManagedYogaClass>(getInitialFormData(classData));
   const [instructorMode, setInstructorMode] = useState<'select' | 'custom'>('select');
   const [selectedInstructor, setSelectedInstructor] = useState<string>('');
+  const [timeMode, setTimeMode] = useState<'select' | 'custom'>('select');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedHour, setSelectedHour] = useState<string>('');
+  const [selectedMinute, setSelectedMinute] = useState<string>('');
+  const [selectedPeriod, setSelectedPeriod] = useState<'AM' | 'PM' | ''>('');
+
+  const parseTimeValue = (raw: string) => {
+    const value = (raw || '').trim();
+    if (value === '') {
+      return { mode: 'select' as const, date: '', hour: '', minute: '', period: '' as const };
+    }
+
+    const withDate = value.match(/^(\d{4}-\d{2}-\d{2})\s*(?:•|-)?\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (withDate) {
+      const [, date, hourRaw, minute, periodRaw] = withDate;
+      const hour = String(parseInt(hourRaw, 10)).padStart(2, '0');
+      const period = (periodRaw || '').toUpperCase() as 'AM' | 'PM';
+      return { mode: 'select' as const, date, hour, minute, period };
+    }
+
+    const timeOnly = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (timeOnly) {
+      const [, hourRaw, minute, periodRaw] = timeOnly;
+      const hour = String(parseInt(hourRaw, 10)).padStart(2, '0');
+      const period = (periodRaw || '').toUpperCase() as 'AM' | 'PM';
+      return { mode: 'select' as const, date: '', hour, minute, period };
+    }
+
+    return { mode: 'custom' as const, date: '', hour: '', minute: '', period: '' as const };
+  };
+
+  const buildTimeValue = (date: string, hour: string, minute: string, period: 'AM' | 'PM' | '') => {
+    if (!hour || !minute || !period) return '';
+    const base = `${hour}:${minute} ${period}`;
+    return date ? `${date} ${base}` : base;
+  };
 
   useEffect(() => {
-    setFormData(getInitialFormData(classData));
+    const next = getInitialFormData(classData);
+    setFormData(next);
+    if (next.category !== 'live') {
+      setTimeMode('select');
+      setSelectedDate('');
+      setSelectedHour('');
+      setSelectedMinute('');
+      setSelectedPeriod('');
+      return;
+    }
+    const parsed = parseTimeValue(next.time || '');
+    setTimeMode(parsed.mode);
+    setSelectedDate(parsed.date);
+    setSelectedHour(parsed.hour);
+    setSelectedMinute(parsed.minute);
+    setSelectedPeriod(parsed.period);
   }, [classData]);
 
   useEffect(() => {
@@ -3109,6 +3160,22 @@ const ClassFormModal: React.FC<ClassFormModalProps> = ({ classData, instructors,
     setInstructorMode('custom');
     setSelectedInstructor('');
   }, [formData.instructor, instructors]);
+
+  useEffect(() => {
+    if (formData.category !== 'live') {
+      setTimeMode('select');
+      setSelectedDate('');
+      setSelectedHour('');
+      setSelectedMinute('');
+      setSelectedPeriod('');
+      return;
+    }
+    if (timeMode !== 'select') return;
+    const next = buildTimeValue(selectedDate, selectedHour, selectedMinute, selectedPeriod);
+    if ((formData.time || '') !== next) {
+      setFormData({ ...formData, time: next });
+    }
+  }, [formData, formData.category, selectedDate, selectedHour, selectedMinute, selectedPeriod, timeMode]);
 
   const addFocus = () => {
     setFormData({ ...formData, focus: [...(formData.focus || ['']), ''] });
@@ -3303,15 +3370,105 @@ const ClassFormModal: React.FC<ClassFormModalProps> = ({ classData, instructors,
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 {formData.category === 'live' ? 'Time *' : 'Time (not used)'}
               </label>
-              <input
-                type="text"
-                required={formData.category === 'live'}
-                value={formData.category === 'live' ? (formData.time || '') : ''}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
-                placeholder="e.g., Mon/Wed/Fri 6:00 AM"
-                disabled={formData.category !== 'live'}
-              />
+              {formData.category !== 'live' ? (
+                <input
+                  type="text"
+                  value=""
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-500"
+                  placeholder="Not used for recorded classes"
+                  disabled
+                />
+              ) : (
+                <div className="space-y-3">
+                  <select
+                    value={timeMode}
+                    onChange={(e) => {
+                      const nextMode = e.target.value as 'select' | 'custom';
+                      setTimeMode(nextMode);
+                      if (nextMode === 'select') {
+                        const parsed = parseTimeValue(formData.time || '');
+                        setSelectedDate(parsed.date);
+                        setSelectedHour(parsed.hour);
+                        setSelectedMinute(parsed.minute);
+                        setSelectedPeriod(parsed.period);
+                        const built = buildTimeValue(parsed.date, parsed.hour, parsed.minute, parsed.period);
+                        setFormData({ ...formData, time: built });
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="select">Pick date & time</option>
+                    <option value="custom">Custom</option>
+                  </select>
+
+                  {timeMode === 'select' ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Date (optional)</label>
+                        <input
+                          type="date"
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Time *</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <select
+                            value={selectedHour}
+                            onChange={(e) => setSelectedHour(e.target.value)}
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="" disabled>
+                              HH
+                            </option>
+                            {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
+                              <option key={h} value={h}>
+                                {h}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={selectedMinute}
+                            onChange={(e) => setSelectedMinute(e.target.value)}
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="" disabled>
+                              MM
+                            </option>
+                            {['00', '15', '30', '45'].map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={selectedPeriod}
+                            onChange={(e) => setSelectedPeriod(e.target.value as 'AM' | 'PM')}
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="" disabled>
+                              AM/PM
+                            </option>
+                            <option value="AM">AM</option>
+                            <option value="PM">PM</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      required
+                      value={formData.time || ''}
+                      onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                      placeholder="e.g., Mon/Wed/Fri 6:00 AM"
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
