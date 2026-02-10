@@ -2,54 +2,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Reveal } from './Reveal';
 import { Search, Plus, MessageSquare, Users, Settings, Info, Send, Smile, Paperclip, X, FileText, Heart, Shield } from 'lucide-react';
-
-interface ChatMessage {
-  id: string;
-  sender: string;
-  avatar: string;
-  text: string;
-  time: string;
-  isMe: boolean;
-  attachment?: { name: string; type: string };
-}
-
-interface Conversation {
-  id: string;
-  author: string;
-  avatar: string;
-  lastText: string;
-  time: string;
-  unreadCount?: number;
-  isGroup?: boolean;
-  members?: number;
-  isSupportGroup?: boolean;
-}
-
-const INITIAL_CONVERSATIONS: Conversation[] = [
-  { id: 'support', author: 'Support Group', avatar: 'SG', lastText: 'Remember: You\'re not alone in this journey...', time: 'Just now', unreadCount: 3, isGroup: true, isSupportGroup: true, members: 24 },
-  { id: '2', author: "Beginner's Circle", avatar: 'BC', lastText: 'I use the Manduka PROlite and...', time: '1h', unreadCount: 2, isGroup: true, members: 5 },
-];
-
-const INITIAL_HISTORIES: Record<string, ChatMessage[]> = {
-  'support': [
-    { id: 's1', sender: 'Pawan (Instructor)', avatar: 'PN', text: "Welcome to the Support Group! This is a safe space for sharing challenges, victories, and everything in between. Remember: progress isn't linear, and every small step counts. 🙏", time: '9:00 AM', isMe: false },
-    { id: 's2', sender: 'Elena D.', avatar: 'ED', text: "Thank you for creating this space. I've been struggling with consistency this week. Any tips?", time: '9:15 AM', isMe: false },
-    { id: 's3', sender: 'Michael T.', avatar: 'MT', text: "Elena, I found that setting a specific time each day helps. Even if it's just 10 minutes, consistency beats intensity. You've got this! 💪", time: '9:20 AM', isMe: false },
-    { id: 's4', sender: 'Priya S.', avatar: 'PS', text: "I had a breakthrough today! After 3 months, I finally touched my toes without bending my knees. Small wins matter! 🎉", time: '10:00 AM', isMe: false },
-    { id: 's5', sender: 'Alex M.', avatar: 'AM', text: "That's amazing, Priya! Celebrating with you. This group has been such a source of motivation for me.", time: '10:05 AM', isMe: false },
-    { id: 's6', sender: 'Support Group', avatar: 'SG', text: "Remember: You're not alone in this journey. We're all here to support each other. If you're having a tough day, reach out - someone is always here to listen. ❤️", time: '11:00 AM', isMe: false },
-  ],
-  '2': [
-    { id: 'g1', sender: 'Beginner\'s Circle', avatar: 'BC', text: "Hey everyone, which mat are you all using? I'm looking to upgrade.", time: '1:00 PM', isMe: false },
-  ],
-};
+import { db } from '../config/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { DEFAULT_COMMUNITY_SETTINGS, type CommunityChatMessage, type CommunityConversation, type CommunitySettings } from '../utils/settings';
 
 export const CommunityPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'All' | 'Direct' | 'Groups'>('All');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [inputText, setInputText] = useState('');
-  const [chatHistories, setChatHistories] = useState(INITIAL_HISTORIES);
+  const [pageTitle, setPageTitle] = useState<string>(DEFAULT_COMMUNITY_SETTINGS.pageTitle);
+  const [pageSubtitle, setPageSubtitle] = useState<string>(DEFAULT_COMMUNITY_SETTINGS.pageSubtitle);
+  const [welcomeTitle, setWelcomeTitle] = useState<string>(DEFAULT_COMMUNITY_SETTINGS.welcomeTitle);
+  const [welcomeSubtitle, setWelcomeSubtitle] = useState<string>(DEFAULT_COMMUNITY_SETTINGS.welcomeSubtitle);
+  const [conversations, setConversations] = useState<CommunityConversation[]>(DEFAULT_COMMUNITY_SETTINGS.conversations);
+  const [chatHistories, setChatHistories] = useState<Record<string, CommunityChatMessage[]>>(DEFAULT_COMMUNITY_SETTINGS.histories);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachedFile, setAttachedFile] = useState<{ name: string; type: string } | null>(null);
   
@@ -64,10 +31,37 @@ export const CommunityPage: React.FC = () => {
     scrollToBottom();
   }, [selectedId, chatHistories]);
 
+  useEffect(() => {
+    const settingsRef = doc(db, 'settings', 'app_settings');
+    const unsubscribe = onSnapshot(
+      settingsRef,
+      (snap) => {
+        const data = snap.data() as any;
+        const community = data?.community as Partial<CommunitySettings> | undefined;
+        if (!community) return;
+
+        if (typeof community.pageTitle === 'string') setPageTitle(community.pageTitle);
+        if (typeof community.pageSubtitle === 'string') setPageSubtitle(community.pageSubtitle);
+        if (typeof community.welcomeTitle === 'string') setWelcomeTitle(community.welcomeTitle);
+        if (typeof community.welcomeSubtitle === 'string') setWelcomeSubtitle(community.welcomeSubtitle);
+        if (Array.isArray(community.conversations) && community.conversations.length > 0) {
+          setConversations(community.conversations as CommunityConversation[]);
+        }
+        if (community.histories && typeof community.histories === 'object') {
+          setChatHistories(community.histories as Record<string, CommunityChatMessage[]>);
+        }
+      },
+      (error) => {
+        console.error('Error listening to community settings:', error);
+      }
+    );
+    return unsubscribe;
+  }, []);
+
   const handleSendMessage = () => {
     if ((!inputText.trim() && !attachedFile) || !selectedId) return;
 
-    const newMessage: ChatMessage = {
+    const newMessage: CommunityChatMessage = {
       id: Date.now().toString(),
       sender: 'Me',
       avatar: 'ME',
@@ -106,13 +100,13 @@ export const CommunityPage: React.FC = () => {
     setShowEmojiPicker(false);
   };
 
-  const filteredConversations = INITIAL_CONVERSATIONS.filter(m => {
+  const filteredConversations = conversations.filter(m => {
     if (activeTab === 'Direct') return !m.isGroup;
     if (activeTab === 'Groups') return m.isGroup;
     return true;
   }).filter(m => m.author.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const selectedConversation = INITIAL_CONVERSATIONS.find(m => m.id === selectedId);
+  const selectedConversation = conversations.find(m => m.id === selectedId);
   const currentMessages = selectedId ? (chatHistories[selectedId] || []) : [];
 
   const commonEmojis = ['🙏', '🧘‍♀️', '✨', '🌿', '🕉️', '🔥', '💧', '🌙', '❤️', '🙌'];
@@ -122,9 +116,9 @@ export const CommunityPage: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
           <Reveal>
-            <h1 className="text-5xl md:text-6xl font-serif font-bold text-slate-900 mb-4">Community</h1>
+            <h1 className="text-5xl md:text-6xl font-serif font-bold text-slate-900 mb-4">{pageTitle}</h1>
             <p className="text-slate-500 max-w-xl mx-auto font-light">
-              Connect with fellow yogis, share experiences, and grow together.
+              {pageSubtitle}
             </p>
           </Reveal>
         </div>
@@ -380,9 +374,9 @@ export const CommunityPage: React.FC = () => {
                 <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mb-8">
                   <MessageSquare size={32} className="text-teal-400" strokeWidth={1.5} />
                 </div>
-                <h3 className="text-2xl font-serif font-bold text-slate-900 mb-2">Welcome to Community Chat</h3>
+                <h3 className="text-2xl font-serif font-bold text-slate-900 mb-2">{welcomeTitle}</h3>
                 <p className="text-slate-400 max-w-sm font-light">
-                  Select a conversation from the sidebar to start chatting with fellow practitioners and instructors.
+                  {welcomeSubtitle}
                 </p>
               </div>
             )}

@@ -10,7 +10,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
 import { isAdminEmail } from '../utils/admin';
-import { getSettings, updateSettings } from '../utils/settings';
+import { DEFAULT_COMMUNITY_SETTINGS, getSettings, updateSettings } from '../utils/settings';
+import type { CommunityChatMessage, CommunityConversation, CommunitySettings } from '../utils/settings';
 import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS, RESEARCH_TOPICS, PRICING_TIERS_INR, PRICING_TIERS_USD } from '../constants';
 import { initializeAllCollections, initializeAsanas, initializeResearch, initializeClasses } from '../utils/initializeCollections';
 import { Asana, Instructor, PricingTier, ResearchTopic, YogaClass } from '../types';
@@ -101,6 +102,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [pricingTiersUSD, setPricingTiersUSD] = useState<PricingTier[]>(PRICING_TIERS_USD);
   const [activePricingCurrency, setActivePricingCurrency] = useState<'inr' | 'usd'>('inr');
   const [isSavingPricing, setIsSavingPricing] = useState(false);
+
+  // Community management state
+  const [communitySettings, setCommunitySettings] = useState<CommunitySettings>(DEFAULT_COMMUNITY_SETTINGS);
+  const [activeCommunityConversationId, setActiveCommunityConversationId] = useState<string>(
+    DEFAULT_COMMUNITY_SETTINGS.conversations[0]?.id || ''
+  );
+  const [isSavingCommunity, setIsSavingCommunity] = useState(false);
 
   // TEMPORARY: No auth required - anyone can access
   const isAdmin = true; // Always true for now
@@ -266,6 +274,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         setClassesComingSoon(settings.classesComingSoon);
         setPricingTiersINR((settings.pricingTiersINR && settings.pricingTiersINR.length > 0) ? settings.pricingTiersINR : PRICING_TIERS_INR);
         setPricingTiersUSD((settings.pricingTiersUSD && settings.pricingTiersUSD.length > 0) ? settings.pricingTiersUSD : PRICING_TIERS_USD);
+        const nextCommunity: CommunitySettings = {
+          ...DEFAULT_COMMUNITY_SETTINGS,
+          ...(settings.community || {}),
+          conversations:
+            settings.community?.conversations && Array.isArray(settings.community.conversations) && settings.community.conversations.length > 0
+              ? (settings.community.conversations as CommunityConversation[])
+              : DEFAULT_COMMUNITY_SETTINGS.conversations,
+          histories:
+            settings.community?.histories && typeof settings.community.histories === 'object'
+              ? (settings.community.histories as Record<string, CommunityChatMessage[]>)
+              : DEFAULT_COMMUNITY_SETTINGS.histories,
+        };
+        setCommunitySettings(nextCommunity);
+        setActiveCommunityConversationId((prev) => {
+          const exists = nextCommunity.conversations.some((c) => c.id === prev);
+          return exists ? prev : (nextCommunity.conversations[0]?.id || '');
+        });
         console.log('✅ Settings loaded:', settings);
       } catch (error: any) {
         console.error('❌ Error loading settings:', error);
@@ -560,6 +585,194 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       alert(`Failed to save pricing: ${error.message || 'Please try again.'}`);
     } finally {
       setIsSavingPricing(false);
+    }
+  };
+
+  const updateCommunitySettings = (updates: Partial<CommunitySettings>) => {
+    setCommunitySettings((prev) => ({ ...prev, ...updates }));
+  };
+
+  const updateCommunityConversation = (index: number, updates: Partial<CommunityConversation>) => {
+    setCommunitySettings((prev) => {
+      const nextConversations = [...(prev.conversations || [])];
+      const current = nextConversations[index];
+      if (!current) return prev;
+
+      const next = { ...current, ...updates };
+      nextConversations[index] = next;
+
+      if (updates.id !== undefined && updates.id !== current.id) {
+        const oldId = current.id;
+        const newId = updates.id;
+        const nextHistories = { ...(prev.histories || {}) };
+        if (oldId && nextHistories[oldId] && newId) {
+          nextHistories[newId] = nextHistories[oldId];
+          delete nextHistories[oldId];
+        }
+        if (activeCommunityConversationId === oldId) {
+          setActiveCommunityConversationId(newId);
+        }
+        return { ...prev, conversations: nextConversations, histories: nextHistories };
+      }
+
+      return { ...prev, conversations: nextConversations };
+    });
+  };
+
+  const addCommunityConversation = () => {
+    setCommunitySettings((prev) => ({
+      ...prev,
+      conversations: [
+        ...(prev.conversations || []),
+        {
+          id: '',
+          author: '',
+          avatar: '',
+          lastText: '',
+          time: '',
+          unreadCount: 0,
+          isGroup: true,
+          isSupportGroup: false,
+          members: 0,
+        },
+      ],
+    }));
+  };
+
+  const removeCommunityConversation = (index: number) => {
+    setCommunitySettings((prev) => {
+      const nextConversations = (prev.conversations || []).filter((_, i) => i !== index);
+      const removed = prev.conversations?.[index];
+      const nextHistories = { ...(prev.histories || {}) };
+      if (removed?.id && nextHistories[removed.id]) {
+        delete nextHistories[removed.id];
+      }
+      const nextActive =
+        removed?.id && activeCommunityConversationId === removed.id ? (nextConversations[0]?.id || '') : activeCommunityConversationId;
+      if (nextActive !== activeCommunityConversationId) {
+        setActiveCommunityConversationId(nextActive);
+      }
+      return { ...prev, conversations: nextConversations, histories: nextHistories };
+    });
+  };
+
+  const getActiveCommunityMessages = () => {
+    return (communitySettings.histories || {})[activeCommunityConversationId] || [];
+  };
+
+  const setActiveCommunityMessages = (next: CommunityChatMessage[] | ((prev: CommunityChatMessage[]) => CommunityChatMessage[])) => {
+    setCommunitySettings((prev) => {
+      const current = (prev.histories || {})[activeCommunityConversationId] || [];
+      const nextMessages = typeof next === 'function' ? (next as any)(current) : next;
+      return {
+        ...prev,
+        histories: {
+          ...(prev.histories || {}),
+          [activeCommunityConversationId]: nextMessages,
+        },
+      };
+    });
+  };
+
+  const updateCommunityMessage = (index: number, updates: Partial<CommunityChatMessage>) => {
+    setActiveCommunityMessages((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...updates };
+      return next;
+    });
+  };
+
+  const addCommunityMessage = () => {
+    setActiveCommunityMessages((prev) => [
+      ...prev,
+      {
+        id: `m-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        sender: '',
+        avatar: '',
+        text: '',
+        time: '',
+        isMe: false,
+      },
+    ]);
+  };
+
+  const removeCommunityMessage = (index: number) => {
+    setActiveCommunityMessages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveCommunity = async () => {
+    try {
+      setIsSavingCommunity(true);
+
+      const cleanText = (v: any) => (typeof v === 'string' ? v.trim() : '');
+      const makeAvatar = (author: string) => {
+        const parts = (author || '').trim().split(/\s+/).filter(Boolean);
+        const letters = parts.map((p) => (p[0] || '').toUpperCase()).join('');
+        return (letters || 'CC').slice(0, 2);
+      };
+      const makeId = (author: string, index: number) => {
+        const base = cleanText(author).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        return base || `conversation-${index + 1}`;
+      };
+
+      const cleanedConversations = (communitySettings.conversations || [])
+        .map((c, index) => {
+          const author = cleanText(c.author);
+          const id = cleanText(c.id) || makeId(author, index);
+          const avatar = cleanText(c.avatar) || makeAvatar(author);
+          const lastText = cleanText(c.lastText);
+          const time = cleanText(c.time);
+          const unreadCount = typeof c.unreadCount === 'number' ? c.unreadCount : 0;
+          const members = typeof c.members === 'number' ? c.members : 0;
+          const isGroup = !!c.isGroup;
+          const isSupportGroup = !!c.isSupportGroup;
+          if (author === '' && lastText === '' && time === '') return null;
+          return { ...c, id, author, avatar, lastText, time, unreadCount, members, isGroup, isSupportGroup } as CommunityConversation;
+        })
+        .filter((c): c is CommunityConversation => !!c);
+
+      const finalConversations = cleanedConversations.length > 0 ? cleanedConversations : DEFAULT_COMMUNITY_SETTINGS.conversations;
+
+      const cleanedHistories: Record<string, CommunityChatMessage[]> = {};
+      finalConversations.forEach((c) => {
+        const raw = (communitySettings.histories || {})[c.id] || [];
+        cleanedHistories[c.id] = (raw || [])
+          .map((m) => {
+            const sender = cleanText(m.sender);
+            const avatar = cleanText(m.avatar) || makeAvatar(sender);
+            const text = cleanText(m.text);
+            const time = cleanText(m.time);
+            const id = cleanText(m.id) || `m-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            if (sender === '' && text === '' && time === '') return null;
+            const attachmentName = cleanText((m.attachment as any)?.name);
+            const attachmentType = cleanText((m.attachment as any)?.type);
+            const attachment = attachmentName && attachmentType ? { name: attachmentName, type: attachmentType } : undefined;
+            return { ...m, id, sender, avatar, text, time, isMe: !!m.isMe, attachment } as CommunityChatMessage;
+          })
+          .filter((m): m is CommunityChatMessage => !!m);
+      });
+
+      const cleaned: CommunitySettings = {
+        pageTitle: cleanText(communitySettings.pageTitle) || DEFAULT_COMMUNITY_SETTINGS.pageTitle,
+        pageSubtitle: cleanText(communitySettings.pageSubtitle) || DEFAULT_COMMUNITY_SETTINGS.pageSubtitle,
+        welcomeTitle: cleanText(communitySettings.welcomeTitle) || DEFAULT_COMMUNITY_SETTINGS.welcomeTitle,
+        welcomeSubtitle: cleanText(communitySettings.welcomeSubtitle) || DEFAULT_COMMUNITY_SETTINGS.welcomeSubtitle,
+        conversations: finalConversations,
+        histories: cleanedHistories,
+      };
+
+      await updateSettings({ community: sanitizeForFirestore(cleaned) });
+      setCommunitySettings(cleaned);
+      setActiveCommunityConversationId((prev) => {
+        const exists = cleaned.conversations.some((c) => c.id === prev);
+        return exists ? prev : (cleaned.conversations[0]?.id || '');
+      });
+      alert('Community saved successfully!');
+    } catch (error: any) {
+      console.error('❌ Error saving community:', error);
+      alert(`Failed to save community: ${error.message || 'Please try again.'}`);
+    } finally {
+      setIsSavingCommunity(false);
     }
   };
 
