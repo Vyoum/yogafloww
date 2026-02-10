@@ -10,7 +10,7 @@ import { initiateRazorpayPayment } from '../utils/razorpay';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginModal, SignupModal } from './LoginModal';
 import { db } from '../config/firebase';
-import { doc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 
 interface PricingProps {
   onShowLogin?: () => void;
@@ -23,6 +23,8 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
   const [pendingPurchase, setPendingPurchase] = useState<PricingTier | null>(null);
   const [isIndia, setIsIndia] = useState<boolean>(true);
   const [showCurrencyToggle, setShowCurrencyToggle] = useState<boolean>(false);
+  const [pricingTiersINR, setPricingTiersINR] = useState<PricingTier[]>(PRICING_TIERS_INR);
+  const [pricingTiersUSD, setPricingTiersUSD] = useState<PricingTier[]>(PRICING_TIERS_USD);
 
   const getCurrentPeriodEnd = (tier: PricingTier): Date => {
     const now = new Date();
@@ -104,7 +106,27 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
       });
   }, []);
 
-  const currentPricingTiers = isIndia ? PRICING_TIERS_INR : PRICING_TIERS_USD;
+  useEffect(() => {
+    const settingsRef = doc(db, 'settings', 'app_settings');
+    const unsubscribe = onSnapshot(
+      settingsRef,
+      (snap) => {
+        const data = snap.data() as any;
+        if (data?.pricingTiersINR && Array.isArray(data.pricingTiersINR) && data.pricingTiersINR.length > 0) {
+          setPricingTiersINR(data.pricingTiersINR as PricingTier[]);
+        }
+        if (data?.pricingTiersUSD && Array.isArray(data.pricingTiersUSD) && data.pricingTiersUSD.length > 0) {
+          setPricingTiersUSD(data.pricingTiersUSD as PricingTier[]);
+        }
+      },
+      (error) => {
+        console.error('Error listening to pricing settings:', error);
+      }
+    );
+    return unsubscribe;
+  }, []);
+
+  const currentPricingTiers = isIndia ? pricingTiersINR : pricingTiersUSD;
 
   // Proceed with purchase after successful login/signup
   useEffect(() => {

@@ -1,9 +1,12 @@
 // Settings management for admin controls
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import type { PricingTier } from '../types';
 
 export interface AppSettings {
   classesComingSoon: boolean;
+  pricingTiersINR?: PricingTier[];
+  pricingTiersUSD?: PricingTier[];
   lastUpdated: any;
 }
 

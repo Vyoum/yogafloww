@@ -11,9 +11,9 @@ import { db } from '../config/firebase';
 import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
 import { isAdminEmail } from '../utils/admin';
 import { getSettings, updateSettings } from '../utils/settings';
-import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS, RESEARCH_TOPICS } from '../constants';
+import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS, RESEARCH_TOPICS, PRICING_TIERS_INR, PRICING_TIERS_USD } from '../constants';
 import { initializeAllCollections, initializeAsanas, initializeResearch, initializeClasses } from '../utils/initializeCollections';
-import { Asana, Instructor, ResearchTopic, YogaClass } from '../types';
+import { Asana, Instructor, PricingTier, ResearchTopic, YogaClass } from '../types';
 import { LoginModal, SignupModal } from './LoginModal';
 import { ProblemSolution } from './ProblemSolution';
 import { Timeline } from './Timeline';
@@ -95,6 +95,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [researchTopics, setResearchTopics] = useState<ResearchTopic[]>([]);
   const [editingResearch, setEditingResearch] = useState<ResearchTopic | null>(null);
   const [isResearchFormOpen, setIsResearchFormOpen] = useState(false);
+
+  // Pricing management state
+  const [pricingTiersINR, setPricingTiersINR] = useState<PricingTier[]>(PRICING_TIERS_INR);
+  const [pricingTiersUSD, setPricingTiersUSD] = useState<PricingTier[]>(PRICING_TIERS_USD);
+  const [activePricingCurrency, setActivePricingCurrency] = useState<'inr' | 'usd'>('inr');
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
 
   // TEMPORARY: No auth required - anyone can access
   const isAdmin = true; // Always true for now
@@ -258,6 +264,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         console.log('⚙️ Loading app settings...');
         const settings = await getSettings();
         setClassesComingSoon(settings.classesComingSoon);
+        setPricingTiersINR((settings.pricingTiersINR && settings.pricingTiersINR.length > 0) ? settings.pricingTiersINR : PRICING_TIERS_INR);
+        setPricingTiersUSD((settings.pricingTiersUSD && settings.pricingTiersUSD.length > 0) ? settings.pricingTiersUSD : PRICING_TIERS_USD);
         console.log('✅ Settings loaded:', settings);
       } catch (error: any) {
         console.error('❌ Error loading settings:', error);
@@ -443,6 +451,115 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       console.error('❌ Error updating coming soon toggle:', error);
       // Revert on error
       setClassesComingSoon(!newValue);
+    }
+  };
+
+  const getActivePricingTiers = () => {
+    return activePricingCurrency === 'inr' ? pricingTiersINR : pricingTiersUSD;
+  };
+
+  const setActivePricingTiers = (next: PricingTier[] | ((prev: PricingTier[]) => PricingTier[])) => {
+    if (activePricingCurrency === 'inr') {
+      setPricingTiersINR(next as any);
+      return;
+    }
+    setPricingTiersUSD(next as any);
+  };
+
+  const updatePricingTier = (index: number, updates: Partial<PricingTier>) => {
+    setActivePricingTiers((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...updates };
+      return next;
+    });
+  };
+
+  const addPricingTier = () => {
+    setActivePricingTiers((prev) => [
+      ...prev,
+      {
+        name: '',
+        price: activePricingCurrency === 'inr' ? '₹' : '$',
+        frequency: '/month',
+        features: [''],
+        isRecommended: false,
+        buttonText: 'Get Started',
+      },
+    ]);
+  };
+
+  const removePricingTier = (index: number) => {
+    setActivePricingTiers((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateTierFeature = (tierIndex: number, featureIndex: number, value: string) => {
+    setActivePricingTiers((prev) => {
+      const next = [...prev];
+      const tier = next[tierIndex];
+      const features = [...(tier.features || [])];
+      features[featureIndex] = value;
+      next[tierIndex] = { ...tier, features };
+      return next;
+    });
+  };
+
+  const addTierFeature = (tierIndex: number) => {
+    setActivePricingTiers((prev) => {
+      const next = [...prev];
+      const tier = next[tierIndex];
+      next[tierIndex] = { ...tier, features: [...(tier.features || []), ''] };
+      return next;
+    });
+  };
+
+  const removeTierFeature = (tierIndex: number, featureIndex: number) => {
+    setActivePricingTiers((prev) => {
+      const next = [...prev];
+      const tier = next[tierIndex];
+      const features = (tier.features || []).filter((_, i) => i !== featureIndex);
+      next[tierIndex] = { ...tier, features: features.length > 0 ? features : [''] };
+      return next;
+    });
+  };
+
+  const handleSavePricing = async () => {
+    try {
+      setIsSavingPricing(true);
+
+      const cleanTiers = (tiers: PricingTier[]) => {
+        return tiers
+          .map((t) => ({
+            ...t,
+            name: (t.name || '').trim(),
+            price: (t.price || '').trim(),
+            frequency: (t.frequency || '').trim(),
+            buttonText: (t.buttonText || '').trim(),
+            features: (t.features || []).map(f => (f || '').trim()).filter(f => f !== ''),
+          }))
+          .filter((t) => t.name !== '' && t.price !== '' && t.frequency !== '' && t.features.length > 0);
+      };
+
+      const nextINR = cleanTiers(pricingTiersINR);
+      const nextUSD = cleanTiers(pricingTiersUSD);
+
+      if (nextINR.length === 0 || nextUSD.length === 0) {
+        alert('Please make sure both INR and USD pricing have at least one complete tier.');
+        return;
+      }
+
+      await updateSettings({
+        pricingTiersINR: sanitizeForFirestore(nextINR),
+        pricingTiersUSD: sanitizeForFirestore(nextUSD),
+      });
+
+      setPricingTiersINR(nextINR);
+      setPricingTiersUSD(nextUSD);
+      alert('Pricing saved successfully!');
+    } catch (error: any) {
+      console.error('❌ Error saving pricing:', error);
+      alert(`Failed to save pricing: ${error.message || 'Please try again.'}`);
+    } finally {
+      setIsSavingPricing(false);
     }
   };
 
@@ -1692,6 +1809,168 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
 
               {activeTab === 'pricing' && (
                 <div className="space-y-6">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <h2 className="text-2xl font-bold text-slate-900">Pricing Management</h2>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1">
+                          <button
+                            onClick={() => setActivePricingCurrency('inr')}
+                            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                              activePricingCurrency === 'inr'
+                                ? 'bg-teal-600 text-white shadow-sm'
+                                : 'text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            ₹ INR
+                          </button>
+                          <button
+                            onClick={() => setActivePricingCurrency('usd')}
+                            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                              activePricingCurrency === 'usd'
+                                ? 'bg-teal-600 text-white shadow-sm'
+                                : 'text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            $ USD
+                          </button>
+                        </div>
+                        <button
+                          onClick={addPricingTier}
+                          className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-sm"
+                        >
+                          <Plus size={18} />
+                          <span>Add Tier</span>
+                        </button>
+                        <button
+                          onClick={handleSavePricing}
+                          disabled={isSavingPricing}
+                          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <CheckCircle2 size={18} />
+                          <span>{isSavingPricing ? 'Saving...' : 'Save Pricing'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-600">
+                      Edit pricing tiers and features. Changes apply to the main pricing section.
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-6 space-y-6">
+                      {getActivePricingTiers().length === 0 ? (
+                        <div className="p-6 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-600">
+                          No pricing tiers yet. Click “Add Tier” to create one.
+                        </div>
+                      ) : (
+                        getActivePricingTiers().map((tier, tierIndex) => (
+                          <div key={`${activePricingCurrency}-${tierIndex}`} className="border border-slate-200 rounded-xl p-5">
+                            <div className="flex items-start justify-between gap-6">
+                              <div className="flex-1 grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">Name *</label>
+                                  <input
+                                    type="text"
+                                    value={tier.name}
+                                    onChange={(e) => updatePricingTier(tierIndex, { name: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                                    placeholder="e.g., Monthly"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">Price *</label>
+                                  <input
+                                    type="text"
+                                    value={tier.price}
+                                    onChange={(e) => updatePricingTier(tierIndex, { price: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                                    placeholder={activePricingCurrency === 'inr' ? '₹1999' : '$29'}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">Frequency *</label>
+                                  <input
+                                    type="text"
+                                    value={tier.frequency}
+                                    onChange={(e) => updatePricingTier(tierIndex, { frequency: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                                    placeholder="/month"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">Button Text *</label>
+                                  <input
+                                    type="text"
+                                    value={tier.buttonText}
+                                    onChange={(e) => updatePricingTier(tierIndex, { buttonText: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                                    placeholder="Get Started"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-3">
+                                <label className="flex items-center gap-2 text-sm text-slate-700 select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!tier.isRecommended}
+                                    onChange={(e) => updatePricingTier(tierIndex, { isRecommended: e.target.checked })}
+                                    className="h-4 w-4"
+                                  />
+                                  Recommended
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => removePricingTier(tierIndex)}
+                                  className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2 text-sm"
+                                >
+                                  <Trash2 size={16} />
+                                  <span>Remove</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="mt-5">
+                              <div className="flex items-center justify-between gap-4 mb-3">
+                                <label className="block text-xs font-medium text-slate-600">Features *</label>
+                                <button
+                                  type="button"
+                                  onClick={() => addTierFeature(tierIndex)}
+                                  className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 text-sm"
+                                >
+                                  <Plus size={16} />
+                                  <span>Add Feature</span>
+                                </button>
+                              </div>
+                              <div className="space-y-2">
+                                {(tier.features && tier.features.length > 0 ? tier.features : ['']).map((feature, featureIndex) => (
+                                  <div key={featureIndex} className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      value={feature}
+                                      onChange={(e) => updateTierFeature(tierIndex, featureIndex, e.target.value)}
+                                      className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                                      placeholder={`Feature ${featureIndex + 1}`}
+                                    />
+                                    {(tier.features?.length || 0) > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeTierFeature(tierIndex, featureIndex)}
+                                        className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
                   <h2 className="text-2xl font-bold text-slate-900 mb-6">Pricing Section Preview</h2>
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <Pricing />
@@ -1831,6 +2110,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       {isClassFormOpen && (
         <ClassFormModal
           classData={editingClass}
+          instructors={instructors}
           onSave={handleSaveClass}
           onClose={() => {
             setIsClassFormOpen(false);
@@ -2772,11 +3052,12 @@ const ResearchFormModal: React.FC<ResearchFormModalProps> = ({ topic, onSave, on
 // Class Form Modal Component
 interface ClassFormModalProps {
   classData: ManagedYogaClass | null;
+  instructors: Instructor[];
   onSave: (cls: ManagedYogaClass) => void;
   onClose: () => void;
 }
 
-const ClassFormModal: React.FC<ClassFormModalProps> = ({ classData, onSave, onClose }) => {
+const ClassFormModal: React.FC<ClassFormModalProps> = ({ classData, instructors, onSave, onClose }) => {
   const getInitialFormData = (data: ManagedYogaClass | null): ManagedYogaClass => {
     if (!data) {
       return {
@@ -2809,10 +3090,25 @@ const ClassFormModal: React.FC<ClassFormModalProps> = ({ classData, onSave, onCl
   };
 
   const [formData, setFormData] = useState<ManagedYogaClass>(getInitialFormData(classData));
+  const [instructorMode, setInstructorMode] = useState<'select' | 'custom'>('select');
+  const [selectedInstructor, setSelectedInstructor] = useState<string>('');
 
   useEffect(() => {
     setFormData(getInitialFormData(classData));
   }, [classData]);
+
+  useEffect(() => {
+    const current = (formData.instructor || '').trim();
+    const normalized = current.toLowerCase();
+    const match = (instructors || []).find((i) => (i.name || '').trim().toLowerCase() === normalized);
+    if (match) {
+      setInstructorMode('select');
+      setSelectedInstructor(match.name);
+      return;
+    }
+    setInstructorMode('custom');
+    setSelectedInstructor('');
+  }, [formData.instructor, instructors]);
 
   const addFocus = () => {
     setFormData({ ...formData, focus: [...(formData.focus || ['']), ''] });
@@ -2931,13 +3227,48 @@ const ClassFormModal: React.FC<ClassFormModalProps> = ({ classData, onSave, onCl
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Instructor *</label>
-              <input
-                type="text"
-                required
-                value={formData.instructor}
-                onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
-              />
+              <div className="space-y-3">
+                <select
+                  value={instructorMode === 'select' ? selectedInstructor : '__custom__'}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '__custom__') {
+                      setInstructorMode('custom');
+                      setSelectedInstructor('');
+                      setFormData({ ...formData, instructor: formData.instructor || '' });
+                      return;
+                    }
+                    setInstructorMode('select');
+                    setSelectedInstructor(value);
+                    setFormData({ ...formData, instructor: value });
+                  }}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value="" disabled>
+                    Select instructor
+                  </option>
+                  {(instructors || [])
+                    .filter((i) => !i.deleted)
+                    .slice()
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                    .map((i) => (
+                      <option key={i.id} value={i.name}>
+                        {i.name}
+                      </option>
+                    ))}
+                  <option value="__custom__">Custom</option>
+                </select>
+                {instructorMode === 'custom' && (
+                  <input
+                    type="text"
+                    required
+                    value={formData.instructor}
+                    onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                    placeholder="Enter instructor name"
+                  />
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Type *</label>
