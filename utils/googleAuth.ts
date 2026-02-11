@@ -1,6 +1,6 @@
 // Google Sign-In Utility using Firebase Authentication
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { auth, googleProvider } from "../config/firebase";
+import { auth, googleProvider, isFirebaseConfigured } from "../config/firebase";
 
 // Handle Google Sign-In using Firebase
 export const handleGoogleSignIn = async (
@@ -8,6 +8,11 @@ export const handleGoogleSignIn = async (
   onError: (error: string) => void
 ) => {
   try {
+    if (!isFirebaseConfigured) {
+      onError('Google sign-in is not configured. Please set your VITE_FIREBASE_* environment variables.');
+      return;
+    }
+
     // Sign in with Google popup
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
@@ -30,6 +35,12 @@ export const handleGoogleSignIn = async (
       onError('Popup was blocked. Please allow popups for this site.');
     } else if (error.code === 'auth/network-request-failed') {
       onError('Network error. Please check your connection.');
+    } else if (error.code === 'auth/operation-not-allowed') {
+      onError('Google sign-in is disabled in Firebase. Enable the Google provider in Firebase Console.');
+    } else if (error.code === 'auth/unauthorized-domain') {
+      onError('This domain is not authorized for Google sign-in. Add it in Firebase Console → Auth → Settings → Authorized domains.');
+    } else if (error.code === 'auth/invalid-api-key') {
+      onError('Firebase configuration is invalid (API key). Check VITE_FIREBASE_API_KEY and restart the dev server.');
     } else {
       onError(error.message || 'Failed to sign in with Google. Please try again.');
     }

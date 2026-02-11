@@ -18,6 +18,13 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? ''
 };
 
+const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId
+);
+
 // Initialize Firebase (throws if config invalid; Error Boundary will show message)
 const app = initializeApp(firebaseConfig);
 
@@ -29,7 +36,7 @@ const googleProvider = new GoogleAuthProvider();
 const db = getFirestore(app);
 
 // Configure Firestore settings for better timeout handling
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && isFirebaseConfigured) {
   // Enable offline persistence (helps with timeouts)
   import('firebase/firestore').then(({ enableIndexedDbPersistence }) => {
     enableIndexedDbPersistence(db).catch((err: any) => {
@@ -47,37 +54,18 @@ if (typeof window !== 'undefined') {
 }
 
 // Debug: Log Firebase initialization and test connectivity
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   console.log('🔥 Firebase Config:', {
     projectId: firebaseConfig.projectId,
     authDomain: firebaseConfig.authDomain,
-    hasApiKey: !!firebaseConfig.apiKey,
-    apiKeyStart: firebaseConfig.apiKey?.substring(0, 10) + '...'
-  });
-  console.log('📦 Firestore db initialized:', !!db);
-  console.log('📦 Firestore app name:', db.app.name);
-  console.log('📦 Firestore app options:', db.app.options);
-  
-  // Test Firestore connectivity
-  import('firebase/firestore').then(async ({ doc, getDoc }) => {
-    try {
-      console.log('🔍 Testing Firestore connectivity...');
-      // Try to read a non-existent document (should return null, not error)
-      const testRef = doc(db, '_test_connection_', 'test');
-      const testSnap = await getDoc(testRef);
-      console.log('✅ Firestore is accessible! (test doc exists:', testSnap.exists(), ')');
-    } catch (error: any) {
-      console.error('❌ Firestore connectivity test failed:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-    }
+    isConfigured: isFirebaseConfigured,
   });
 }
 
 // Initialize Analytics only in browser environment
 let analytics;
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && isFirebaseConfigured && firebaseConfig.measurementId) {
   analytics = getAnalytics(app);
 }
 
-export { app, analytics, auth, googleProvider, db };
+export { app, analytics, auth, googleProvider, db, isFirebaseConfigured };

@@ -29,7 +29,7 @@ interface RazorpayOptions {
 }
 
 export const initiateRazorpayPayment = (
-  amount: number,
+  amount: number | string,
   planName: string,
   planFrequency: string,
   onSuccess?: (response: any) => void,
@@ -55,7 +55,7 @@ export const initiateRazorpayPayment = (
 };
 
 const openRazorpayCheckout = (
-  amount: number,
+  amount: number | string,
   planName: string,
   planFrequency: string,
   onSuccess?: (response: any) => void,

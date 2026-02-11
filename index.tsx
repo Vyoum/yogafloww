@@ -11,6 +11,7 @@ class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; error: Error | null }
 > {
+  declare props: { children: React.ReactNode };
   state = { hasError: false, error: null as Error | null };
 
   static getDerivedStateFromError(error: Error) {
