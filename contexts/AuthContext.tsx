@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { isAdminEmail } from '../utils/admin';
 
 interface User {
   id: string;
@@ -14,6 +15,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  isAdminChecking: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (name: string, email: string, password: string) => Promise<boolean>;
   loginWithGoogle: (googleUser: { name: string; email: string; picture?: string }) => Promise<boolean>;
@@ -24,11 +27,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminChecking, setIsAdminChecking] = useState(false);
 
   useEffect(() => {
     // Listen for Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
+        setIsAdminChecking(true);
+        setIsAdmin(isAdminEmail(firebaseUser.email));
         // User is signed in with Firebase
         const userData: User = {
           id: firebaseUser.uid,
@@ -68,10 +75,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }, { merge: true });
             console.log('✅ User document updated successfully');
           }
+
+          const latestUserDoc = await getDoc(userRef);
+          const latestData = latestUserDoc.data() as any;
+          const roleAdmin =
+            latestData?.role === 'admin' ||
+            latestData?.isAdmin === true ||
+            (Array.isArray(latestData?.roles) && latestData.roles.includes('admin'));
+          setIsAdmin(roleAdmin || isAdminEmail(firebaseUser.email));
+          setIsAdminChecking(false);
         } catch (error: any) {
           console.error('❌ Error saving user to Firestore:', error);
           console.error('Error code:', error.code);
           console.error('Error message:', error.message);
+          setIsAdmin(isAdminEmail(firebaseUser.email));
+          setIsAdminChecking(false);
         }
       } else {
         // User is signed out, check localStorage for manual login
@@ -84,16 +102,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const foundUser = users.find((u: any) => u.email === parsedUser.email);
             if (foundUser && foundUser.password) {
               setUser(parsedUser);
+              try {
+                const userRef = doc(db, 'users', parsedUser.id);
+                const userDoc = await getDoc(userRef);
+                const data = userDoc.data() as any;
+                const roleAdmin =
+                  data?.role === 'admin' ||
+                  data?.isAdmin === true ||
+                  (Array.isArray(data?.roles) && data.roles.includes('admin'));
+                setIsAdmin(roleAdmin || isAdminEmail(parsedUser.email));
+              } catch {
+                setIsAdmin(isAdminEmail(parsedUser.email));
+              }
+              setIsAdminChecking(false);
             } else {
               setUser(null);
               localStorage.removeItem('yogaFlowUser');
+              setIsAdmin(false);
+              setIsAdminChecking(false);
             }
           } catch (e) {
             console.error('Error loading user data:', e);
             setUser(null);
+            setIsAdmin(false);
+            setIsAdminChecking(false);
           }
         } else {
           setUser(null);
+          setIsAdmin(false);
+          setIsAdminChecking(false);
         }
       }
     });
@@ -240,6 +277,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       user,
       isAuthenticated: !!user,
+      isAdmin,
+      isAdminChecking,
       login,
       signup,
       loginWithGoogle,

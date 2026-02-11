@@ -4,11 +4,16 @@ service cloud.firestore {
     
     // Helper function to check if user is admin
     function isAdmin() {
-      return request.auth != null && 
-             request.auth.token.email != null &&
-             (request.auth.token.email.matches('.*@yogaflow\\.com$') ||
-              request.auth.token.email == 'admin@yogaflow.com' ||
-              request.auth.token.email == 'support@yogaflow.com');
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return request.auth != null && (
+        (request.auth.token.email != null &&
+          (request.auth.token.email.matches('.*@yogaflow\\.com$') ||
+            request.auth.token.email == 'admin@yogaflow.com' ||
+            request.auth.token.email == 'support@yogaflow.com')) ||
+        userDoc.role == 'admin' ||
+        userDoc.isAdmin == true ||
+        (userDoc.roles is list && userDoc.roles.hasAny(['admin']))
+      );
     }
     
     // Helper function to check if user is authenticated

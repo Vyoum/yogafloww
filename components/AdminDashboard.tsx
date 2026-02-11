@@ -9,7 +9,6 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
-import { isAdminEmail } from '../utils/admin';
 import { DEFAULT_COMMUNITY_SETTINGS, getSettings, updateSettings } from '../utils/settings';
 import type { CommunityChatMessage, CommunityConversation, CommunitySettings } from '../utils/settings';
 import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS, RESEARCH_TOPICS, PRICING_TIERS_INR, PRICING_TIERS_USD } from '../constants';
@@ -63,7 +62,7 @@ type TabType = 'overview' | 'users' | 'journey' | 'asanas' | 'classes' | 'classe
 type ManagedYogaClass = YogaClass & { category: 'live' | 'recorded' };
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin, isAdminChecking } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [users, setUsers] = useState<UserData[]>([]);
   const [contactSubmissions, setContactSubmissions] = useState<ContactSubmission[]>([]);
@@ -110,10 +109,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   );
   const [isSavingCommunity, setIsSavingCommunity] = useState(false);
 
-  // TEMPORARY: No auth required - anyone can access
-  const isAdmin = true; // Always true for now
-  const isAuthenticated = true; // Always true for now
-
   const sanitizeForFirestore = (value: any): any => {
     if (Array.isArray(value)) {
       return value
@@ -133,10 +128,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   };
 
   useEffect(() => {
-    // Load data immediately without auth check
-    console.log('✅ Loading admin data (no auth required)...');
+    if (!isAuthenticated || isAdminChecking || !isAdmin) {
+      setIsLoading(false);
+      return;
+    }
     loadData();
-  }, []);
+  }, [isAuthenticated, isAdmin, isAdminChecking]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -1195,7 +1192,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Admin Dashboard</h1>
-                  <p className="text-xs text-slate-500">Public Access (No Auth Required)</p>
+                  <p className="text-xs text-slate-500">
+                    {isAdminChecking
+                      ? 'Checking permissions...'
+                      : isAuthenticated
+                        ? isAdmin
+                          ? 'Admin access'
+                          : 'Access restricted'
+                        : 'Sign in required'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1210,6 +1215,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         </div>
       </header>
 
+      {isAuthenticated && isAdmin && !isAdminChecking ? (
       <div className="flex max-w-7xl mx-auto">
         {/* Sidebar */}
         <aside className="w-64 bg-white border-r border-slate-200 min-h-[calc(100vh-80px)] sticky top-[80px]">
@@ -2282,6 +2288,72 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           )}
         </main>
       </div>
+      ) : (
+        <div className="max-w-3xl mx-auto px-6 py-10">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+            {!isAuthenticated ? (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Sign in to continue</h2>
+                  <p className="text-slate-600 mt-2">
+                    Only approved admin users can access this portal.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsLoginModalOpen(true)}
+                    className="px-5 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium"
+                  >
+                    Sign in
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSignupModalOpen(true)}
+                    className="px-5 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
+                  >
+                    Sign up
+                  </button>
+                </div>
+              </div>
+            ) : isAdminChecking ? (
+              <div className="flex items-center gap-3 text-slate-700">
+                <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                <span className="font-medium">Checking admin permissions...</span>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Access denied</h2>
+                  <p className="text-slate-600 mt-2">
+                    {user?.email ? `Signed in as ${user.email}. ` : ''}
+                    Your account does not have admin access.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      onBack();
+                    }}
+                    className="px-5 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
+                  >
+                    Sign out
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="px-5 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium"
+                  >
+                    Back to site
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Asana Form Modal */}
       {isAsanaFormOpen && (
@@ -2331,6 +2403,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           }}
         />
       )}
+
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onSwitchToSignup={() => {
+          setIsLoginModalOpen(false);
+          setIsSignupModalOpen(true);
+        }}
+      />
+      <SignupModal
+        isOpen={isSignupModalOpen}
+        onClose={() => setIsSignupModalOpen(false)}
+        onSwitchToLogin={() => {
+          setIsSignupModalOpen(false);
+          setIsLoginModalOpen(true);
+        }}
+      />
     </div>
   );
 };
