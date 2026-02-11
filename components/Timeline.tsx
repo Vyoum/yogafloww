@@ -1,10 +1,13 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SectionHeading } from './SectionHeading';
 import { TIMELINE_STEPS } from '../constants';
-import { Quote, Check, ArrowDown } from 'lucide-react';
+import { Quote, Check, ArrowDown, Battery, Brain, Activity, User, ShieldCheck, Heart, Trees, Moon, type LucideIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginModal, SignupModal } from './LoginModal';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import type { JourneySettings, JourneyTimelineStepSettings } from '../types';
 
 // Custom hook for intersection observer
 const useInView = (options = { threshold: 0.1, rootMargin: '-20px' }) => {
@@ -133,6 +136,30 @@ export const Timeline: React.FC<TimelineProps> = ({ onNavPricing }) => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
   const [shouldNavigateToPricing, setShouldNavigateToPricing] = useState(false);
+  const [settings, setSettings] = useState<JourneySettings | null>(null);
+
+  const iconMap = useMemo<Record<string, LucideIcon>>(
+    () => ({
+      Moon,
+      Brain,
+      Activity,
+      User,
+      Battery,
+      ShieldCheck,
+      Heart,
+      Trees,
+    }),
+    []
+  );
+
+  useEffect(() => {
+    const settingsRef = doc(db, 'settings', 'app_settings');
+    const unsubscribe = onSnapshot(settingsRef, (snap) => {
+      const data = (snap.data() as any) || {};
+      setSettings((data.journey as JourneySettings) || null);
+    });
+    return unsubscribe;
+  }, []);
 
   const handleReadyToStart = () => {
     if (!isAuthenticated) {
@@ -153,17 +180,44 @@ export const Timeline: React.FC<TimelineProps> = ({ onNavPricing }) => {
     }
   }, [isAuthenticated, shouldNavigateToPricing, onNavPricing]);
 
+  const derivedSteps = useMemo(() => {
+    const source = settings?.steps;
+    if (!Array.isArray(source) || source.length === 0) return TIMELINE_STEPS;
+    return (source as JourneyTimelineStepSettings[])
+      .filter((s) => s && typeof s.month === 'string' && typeof s.title === 'string')
+      .map((s) => ({
+        month: s.month,
+        title: s.title,
+        outcomes: Array.isArray(s.outcomes) ? s.outcomes.filter((o) => typeof o === 'string' && o.trim().length > 0) : [],
+        icon: iconMap[s.iconName] || Moon,
+        testimonial: {
+          text: s.testimonial?.text || '',
+          author: s.testimonial?.author || '',
+        },
+        metrics: Array.isArray(s.metrics)
+          ? s.metrics
+              .filter((m) => m && typeof m.label === 'string' && typeof m.value === 'string')
+              .map((m) => ({ label: m.label, value: m.value }))
+          : [],
+      }));
+  }, [iconMap, settings?.steps]);
+
+  const headingTitle = settings?.timelineTitle || 'The Path to Transformation';
+  const headingSubtitle = settings?.timelineSubtitle || '6 months. 3 distinct phases. A lifetime of measurable change.';
+  const ctaTitle = settings?.ctaTitle || 'Ready to start Month 1?';
+  const ctaSubtitle = settings?.ctaSubtitle || 'Focus: Restoring your nervous system and sleep architecture.';
+
   return (
     <>
       <section id="path-to-transformation" className="bg-white pt-24 md:pt-32 pb-12 md:pb-16 px-6 overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <SectionHeading 
-            title="The Path to Transformation" 
-            subtitle="6 months. 3 distinct phases. A lifetime of measurable change."
+            title={headingTitle}
+            subtitle={headingSubtitle}
           />
 
           <div className="relative mt-16 md:mt-32 max-w-5xl mx-auto">
-             {TIMELINE_STEPS.map((step, idx) => (
+             {derivedSteps.map((step, idx) => (
                <TimelineCard key={idx} step={step} index={idx} />
              ))}
           </div>
@@ -175,8 +229,12 @@ export const Timeline: React.FC<TimelineProps> = ({ onNavPricing }) => {
                 className="p-10 bg-teal-50 rounded-[3rem] inline-block w-full max-w-2xl border border-teal-100 hover:bg-teal-100 hover:border-teal-200 transition-all duration-300 cursor-pointer group"
               >
                  <ArrowDown className="w-6 h-6 mx-auto text-teal-400 mb-6 animate-bounce group-hover:text-teal-600 transition-colors" />
-                 <h4 className="text-2xl md:text-3xl font-serif font-bold text-teal-900 mb-4 tracking-tight group-hover:text-teal-800 transition-colors">Ready to start Month 1?</h4>
-                 <p className="text-teal-700 font-light mb-0 text-lg group-hover:text-teal-800 transition-colors">Focus: Restoring your nervous system and sleep architecture.</p>
+                 <h4 className="text-2xl md:text-3xl font-serif font-bold text-teal-900 mb-4 tracking-tight group-hover:text-teal-800 transition-colors">
+                   {ctaTitle}
+                 </h4>
+                 <p className="text-teal-700 font-light mb-0 text-lg group-hover:text-teal-800 transition-colors">
+                   {ctaSubtitle}
+                 </p>
               </button>
           </div>
         </div>

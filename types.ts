@@ -22,6 +22,52 @@ export interface TimelinePhase {
   }[];
 }
 
+export type JourneyIconName =
+  | 'Moon'
+  | 'Brain'
+  | 'Activity'
+  | 'User'
+  | 'Battery'
+  | 'ShieldCheck'
+  | 'Heart'
+  | 'Trees';
+
+export interface JourneyListItemSettings {
+  text: string;
+  iconName: JourneyIconName;
+}
+
+export interface JourneyTimelineMetricSettings {
+  label: string;
+  value: string;
+}
+
+export interface JourneyTimelineStepSettings {
+  month: string;
+  title: string;
+  outcomes: string[];
+  iconName: JourneyIconName;
+  testimonial: {
+    text: string;
+    author: string;
+  };
+  metrics: JourneyTimelineMetricSettings[];
+}
+
+export interface JourneySettings {
+  problemSolutionTitle: string;
+  problemSolutionSubtitle: string;
+  problemsHeading: string;
+  solutionsHeading: string;
+  problems: JourneyListItemSettings[];
+  solutions: JourneyListItemSettings[];
+  timelineTitle: string;
+  timelineSubtitle: string;
+  ctaTitle: string;
+  ctaSubtitle: string;
+  steps: JourneyTimelineStepSettings[];
+}
+
 export interface ClassSession {
   day: string;
   focus: string;

@@ -1,7 +1,7 @@
 // Settings management for admin controls
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { PricingTier } from '../types';
+import type { JourneySettings, PricingTier } from '../types';
 
 export interface CommunityAttachment {
   name: string;
@@ -136,6 +136,7 @@ export interface AppSettings {
   pricingTiersINR?: PricingTier[];
   pricingTiersUSD?: PricingTier[];
   community?: CommunitySettings;
+  journey?: JourneySettings;
   lastUpdated: any;
 }
 

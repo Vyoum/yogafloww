@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, Layout, Activity, BookOpen, UsersRound, DollarSign, 
   MessageSquare, Music, FileText, Search, Filter, Download,
-  ArrowLeft, Shield, Calendar, Mail, User as UserIcon, LogOut,
+  ArrowLeft, Shield, Calendar, Mail, User as UserIcon, LogOut, User as LucideUser, Brain, Battery, Heart, Trees, Moon,
   TrendingUp, Eye, Edit, Trash2, CheckCircle2, XCircle, Upload, Video, ToggleLeft, ToggleRight, Plus,
   Sparkles, Target, ChevronRight, X, ShieldCheck, Microscope, ExternalLink
 } from 'lucide-react';
@@ -11,9 +11,9 @@ import { db } from '../config/firebase';
 import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
 import { DEFAULT_COMMUNITY_SETTINGS, getSettings, updateSettings } from '../utils/settings';
 import type { CommunityChatMessage, CommunityConversation, CommunitySettings } from '../utils/settings';
-import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS, RESEARCH_TOPICS, PRICING_TIERS_INR, PRICING_TIERS_USD } from '../constants';
+import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS, RESEARCH_TOPICS, PRICING_TIERS_INR, PRICING_TIERS_USD, PROBLEMS, SOLUTIONS, TIMELINE_STEPS } from '../constants';
 import { initializeAllCollections, initializeAsanas, initializeResearch, initializeClasses } from '../utils/initializeCollections';
-import { Asana, Instructor, PricingTier, ResearchTopic, YogaClass } from '../types';
+import { Asana, Instructor, PricingTier, ResearchTopic, YogaClass, type JourneyIconName, type JourneyListItemSettings, type JourneySettings, type JourneyTimelineStepSettings } from '../types';
 import { LoginModal, SignupModal } from './LoginModal';
 import { ProblemSolution } from './ProblemSolution';
 import { Timeline } from './Timeline';
@@ -108,6 +108,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     DEFAULT_COMMUNITY_SETTINGS.conversations[0]?.id || ''
   );
   const [isSavingCommunity, setIsSavingCommunity] = useState(false);
+  const [journeySettings, setJourneySettings] = useState<JourneySettings | null>(null);
+  const [isSavingJourney, setIsSavingJourney] = useState(false);
+  const [isJourneyStepModalOpen, setIsJourneyStepModalOpen] = useState(false);
+  const [editingJourneyStepIndex, setEditingJourneyStepIndex] = useState<number | null>(null);
 
   const sanitizeForFirestore = (value: any): any => {
     if (Array.isArray(value)) {
@@ -125,6 +129,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       return result;
     }
     return value;
+  };
+
+  const iconNameByComponent = useMemo(
+    () =>
+      new Map<any, JourneyIconName>([
+        [Moon, 'Moon'],
+        [Brain, 'Brain'],
+        [Activity, 'Activity'],
+        [LucideUser, 'User'],
+        [Battery, 'Battery'],
+        [ShieldCheck, 'ShieldCheck'],
+        [Heart, 'Heart'],
+        [Trees, 'Trees'],
+      ]),
+    []
+  );
+
+  const getJourneyIconName = (icon: any): JourneyIconName => {
+    return iconNameByComponent.get(icon) || 'Moon';
+  };
+
+  const getDefaultJourneySettings = (): JourneySettings => {
+    const problems: JourneyListItemSettings[] = (PROBLEMS as any[]).map((p) => ({
+      text: String(p?.text || ''),
+      iconName: getJourneyIconName(p?.icon),
+    }));
+
+    const solutions: JourneyListItemSettings[] = (SOLUTIONS as any[]).map((s) => ({
+      text: String(s?.text || ''),
+      iconName: getJourneyIconName(s?.icon),
+    }));
+
+    const steps: JourneyTimelineStepSettings[] = (TIMELINE_STEPS as any[]).map((st) => ({
+      month: String(st?.month || ''),
+      title: String(st?.title || ''),
+      outcomes: Array.isArray(st?.outcomes) ? st.outcomes.map((o: any) => String(o || '')).filter((o: string) => o.trim().length > 0) : [],
+      iconName: getJourneyIconName(st?.icon),
+      testimonial: {
+        text: String(st?.testimonial?.text || ''),
+        author: String(st?.testimonial?.author || ''),
+      },
+      metrics: Array.isArray(st?.metrics)
+        ? st.metrics
+            .map((m: any) => ({ label: String(m?.label || ''), value: String(m?.value || '') }))
+            .filter((m: any) => m.label.trim().length > 0 || m.value.trim().length > 0)
+        : [],
+    }));
+
+    return {
+      problemSolutionTitle: 'Modern Life is Loud. We Offer Silence.',
+      problemSolutionSubtitle: 'Bridging the gap between Himalayan tradition and urban performance.',
+      problemsHeading: 'The Modern Struggle',
+      solutionsHeading: 'The Rishikesh Solution',
+      problems,
+      solutions,
+      timelineTitle: 'The Path to Transformation',
+      timelineSubtitle: '6 months. 3 distinct phases. A lifetime of measurable change.',
+      ctaTitle: 'Ready to start Month 1?',
+      ctaSubtitle: 'Focus: Restoring your nervous system and sleep architecture.',
+      steps,
+    };
   };
 
   useEffect(() => {
@@ -288,9 +353,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           const exists = nextCommunity.conversations.some((c) => c.id === prev);
           return exists ? prev : (nextCommunity.conversations[0]?.id || '');
         });
+        const fallbackJourney = getDefaultJourneySettings();
+        const loadedJourney = (settings as any).journey as JourneySettings | undefined;
+        const nextJourney: JourneySettings = {
+          ...fallbackJourney,
+          ...(loadedJourney || {}),
+          problems:
+            loadedJourney?.problems && Array.isArray(loadedJourney.problems) && loadedJourney.problems.length > 0
+              ? (loadedJourney.problems as JourneyListItemSettings[])
+              : fallbackJourney.problems,
+          solutions:
+            loadedJourney?.solutions && Array.isArray(loadedJourney.solutions) && loadedJourney.solutions.length > 0
+              ? (loadedJourney.solutions as JourneyListItemSettings[])
+              : fallbackJourney.solutions,
+          steps:
+            loadedJourney?.steps && Array.isArray(loadedJourney.steps) && loadedJourney.steps.length > 0
+              ? (loadedJourney.steps as JourneyTimelineStepSettings[])
+              : fallbackJourney.steps,
+        };
+        setJourneySettings(nextJourney);
         console.log('✅ Settings loaded:', settings);
       } catch (error: any) {
         console.error('❌ Error loading settings:', error);
+        setJourneySettings(getDefaultJourneySettings());
       }
 
       // Load class videos from Firestore
@@ -582,6 +667,161 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       alert(`Failed to save pricing: ${error.message || 'Please try again.'}`);
     } finally {
       setIsSavingPricing(false);
+    }
+  };
+
+  const journeyIconOptions: JourneyIconName[] = [
+    'Moon',
+    'Brain',
+    'Activity',
+    'User',
+    'Battery',
+    'ShieldCheck',
+    'Heart',
+    'Trees',
+  ];
+
+  const updateJourneySettings = (updates: Partial<JourneySettings>) => {
+    setJourneySettings((prev) => (prev ? { ...prev, ...updates } : prev));
+  };
+
+  const updateJourneyListItem = (
+    list: 'problems' | 'solutions',
+    index: number,
+    updates: Partial<JourneyListItemSettings>
+  ) => {
+    setJourneySettings((prev) => {
+      if (!prev) return prev;
+      const nextList = [...(prev[list] || [])];
+      const current = nextList[index];
+      if (!current) return prev;
+      nextList[index] = { ...current, ...updates };
+      return { ...prev, [list]: nextList };
+    });
+  };
+
+  const addJourneyListItem = (list: 'problems' | 'solutions') => {
+    setJourneySettings((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [list]: [...(prev[list] || []), { text: '', iconName: 'Moon' }],
+      };
+    });
+  };
+
+  const removeJourneyListItem = (list: 'problems' | 'solutions', index: number) => {
+    setJourneySettings((prev) => {
+      if (!prev) return prev;
+      const nextList = (prev[list] || []).filter((_, i) => i !== index);
+      return { ...prev, [list]: nextList.length > 0 ? nextList : [{ text: '', iconName: 'Moon' }] };
+    });
+  };
+
+  const getDefaultJourneyStep = (): JourneyTimelineStepSettings => ({
+    month: '',
+    title: '',
+    outcomes: [''],
+    iconName: 'Moon',
+    testimonial: { text: '', author: '' },
+    metrics: [{ label: '', value: '' }],
+  });
+
+  const openJourneyStepModal = (index: number | null) => {
+    setEditingJourneyStepIndex(index);
+    setIsJourneyStepModalOpen(true);
+  };
+
+  const deleteJourneyStep = (index: number) => {
+    setJourneySettings((prev) => {
+      if (!prev) return prev;
+      const nextSteps = (prev.steps || []).filter((_, i) => i !== index);
+      return { ...prev, steps: nextSteps.length > 0 ? nextSteps : [getDefaultJourneyStep()] };
+    });
+  };
+
+  const upsertJourneyStep = (step: JourneyTimelineStepSettings) => {
+    setJourneySettings((prev) => {
+      if (!prev) return prev;
+      const nextSteps = [...(prev.steps || [])];
+      if (editingJourneyStepIndex === null || editingJourneyStepIndex === undefined) {
+        nextSteps.push(step);
+      } else if (nextSteps[editingJourneyStepIndex]) {
+        nextSteps[editingJourneyStepIndex] = step;
+      } else {
+        nextSteps.push(step);
+      }
+      return { ...prev, steps: nextSteps };
+    });
+    setIsJourneyStepModalOpen(false);
+    setEditingJourneyStepIndex(null);
+  };
+
+  const handleSaveJourney = async () => {
+    if (!journeySettings) return;
+    try {
+      setIsSavingJourney(true);
+
+      const cleanText = (v: any) => (typeof v === 'string' ? v.trim() : '');
+
+      const cleanList = (items: JourneyListItemSettings[]) => {
+        return (items || [])
+          .map((i) => ({
+            text: cleanText(i.text),
+            iconName: (journeyIconOptions.includes(i.iconName) ? i.iconName : 'Moon') as JourneyIconName,
+          }))
+          .filter((i) => i.text.length > 0);
+      };
+
+      const cleanStep = (s: JourneyTimelineStepSettings): JourneyTimelineStepSettings => {
+        const outcomes = Array.isArray(s.outcomes) ? s.outcomes.map((o) => cleanText(o)).filter((o) => o.length > 0) : [];
+        const metrics = Array.isArray(s.metrics)
+          ? s.metrics
+              .map((m) => ({ label: cleanText(m.label), value: cleanText(m.value) }))
+              .filter((m) => m.label.length > 0 && m.value.length > 0)
+          : [];
+
+        return {
+          month: cleanText(s.month),
+          title: cleanText(s.title),
+          outcomes,
+          iconName: (journeyIconOptions.includes(s.iconName) ? s.iconName : 'Moon') as JourneyIconName,
+          testimonial: {
+            text: cleanText(s.testimonial?.text),
+            author: cleanText(s.testimonial?.author),
+          },
+          metrics,
+        };
+      };
+
+      const cleaned: JourneySettings = {
+        ...journeySettings,
+        problemSolutionTitle: cleanText(journeySettings.problemSolutionTitle),
+        problemSolutionSubtitle: cleanText(journeySettings.problemSolutionSubtitle),
+        problemsHeading: cleanText(journeySettings.problemsHeading),
+        solutionsHeading: cleanText(journeySettings.solutionsHeading),
+        timelineTitle: cleanText(journeySettings.timelineTitle),
+        timelineSubtitle: cleanText(journeySettings.timelineSubtitle),
+        ctaTitle: cleanText(journeySettings.ctaTitle),
+        ctaSubtitle: cleanText(journeySettings.ctaSubtitle),
+        problems: cleanList(journeySettings.problems || []),
+        solutions: cleanList(journeySettings.solutions || []),
+        steps: (journeySettings.steps || []).map(cleanStep).filter((s) => s.month.length > 0 && s.title.length > 0),
+      };
+
+      if (cleaned.problems.length === 0 || cleaned.solutions.length === 0 || cleaned.steps.length === 0) {
+        alert('Please add at least 1 problem, 1 solution, and 1 timeline step.');
+        return;
+      }
+
+      await updateSettings({ journey: sanitizeForFirestore(cleaned) });
+      setJourneySettings(cleaned);
+      alert('Journey saved successfully!');
+    } catch (error: any) {
+      console.error('❌ Error saving journey:', error);
+      alert(`Failed to save journey: ${error.message || 'Please try again.'}`);
+    } finally {
+      setIsSavingJourney(false);
     }
   };
 
@@ -1608,7 +1848,267 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
               {/* Content Sections */}
               {activeTab === 'journey' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-slate-900 mb-6">Journey Section Preview</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-slate-900">Journey Management</h2>
+                    <button
+                      onClick={handleSaveJourney}
+                      disabled={isSavingJourney || !journeySettings}
+                      className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <CheckCircle2 size={18} />
+                      <span>{isSavingJourney ? 'Saving...' : 'Save Journey'}</span>
+                    </button>
+                  </div>
+
+                  {!journeySettings ? (
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                      <div className="flex items-center gap-3 text-slate-700">
+                        <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                        <span className="font-medium">Loading journey settings...</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 space-y-4">
+                          <h3 className="text-lg font-bold text-slate-900">Problem & Solution</h3>
+                          <div className="grid grid-cols-1 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">Heading Title</label>
+                              <input
+                                type="text"
+                                value={journeySettings.problemSolutionTitle}
+                                onChange={(e) => updateJourneySettings({ problemSolutionTitle: e.target.value })}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">Heading Subtitle</label>
+                              <input
+                                type="text"
+                                value={journeySettings.problemSolutionSubtitle}
+                                onChange={(e) => updateJourneySettings({ problemSolutionSubtitle: e.target.value })}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                              />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Problems Heading</label>
+                                <input
+                                  type="text"
+                                  value={journeySettings.problemsHeading}
+                                  onChange={(e) => updateJourneySettings({ problemsHeading: e.target.value })}
+                                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Solutions Heading</label>
+                                <input
+                                  type="text"
+                                  value={journeySettings.solutionsHeading}
+                                  onChange={(e) => updateJourneySettings({ solutionsHeading: e.target.value })}
+                                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 space-y-4">
+                          <h3 className="text-lg font-bold text-slate-900">Timeline</h3>
+                          <div className="grid grid-cols-1 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">Timeline Title</label>
+                              <input
+                                type="text"
+                                value={journeySettings.timelineTitle}
+                                onChange={(e) => updateJourneySettings({ timelineTitle: e.target.value })}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">Timeline Subtitle</label>
+                              <input
+                                type="text"
+                                value={journeySettings.timelineSubtitle}
+                                onChange={(e) => updateJourneySettings({ timelineSubtitle: e.target.value })}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                              />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">CTA Title</label>
+                                <input
+                                  type="text"
+                                  value={journeySettings.ctaTitle}
+                                  onChange={(e) => updateJourneySettings({ ctaTitle: e.target.value })}
+                                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">CTA Subtitle</label>
+                                <input
+                                  type="text"
+                                  value={journeySettings.ctaSubtitle}
+                                  onChange={(e) => updateJourneySettings({ ctaSubtitle: e.target.value })}
+                                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-slate-900">Problems</h3>
+                            <button
+                              type="button"
+                              onClick={() => addJourneyListItem('problems')}
+                              className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2"
+                            >
+                              <Plus size={16} />
+                              Add
+                            </button>
+                          </div>
+                          <div className="space-y-3">
+                            {(journeySettings.problems || []).map((item, idx) => (
+                              <div key={idx} className="flex gap-3 items-center">
+                                <select
+                                  value={item.iconName}
+                                  onChange={(e) => updateJourneyListItem('problems', idx, { iconName: e.target.value as JourneyIconName })}
+                                  className="px-3 py-2 border border-slate-200 rounded-lg bg-white"
+                                >
+                                  {journeyIconOptions.map((opt) => (
+                                    <option key={opt} value={opt}>
+                                      {opt}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="text"
+                                  value={item.text}
+                                  onChange={(e) => updateJourneyListItem('problems', idx, { text: e.target.value })}
+                                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeJourneyListItem('problems', idx)}
+                                  className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                                  title="Remove"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-slate-900">Solutions</h3>
+                            <button
+                              type="button"
+                              onClick={() => addJourneyListItem('solutions')}
+                              className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2"
+                            >
+                              <Plus size={16} />
+                              Add
+                            </button>
+                          </div>
+                          <div className="space-y-3">
+                            {(journeySettings.solutions || []).map((item, idx) => (
+                              <div key={idx} className="flex gap-3 items-center">
+                                <select
+                                  value={item.iconName}
+                                  onChange={(e) => updateJourneyListItem('solutions', idx, { iconName: e.target.value as JourneyIconName })}
+                                  className="px-3 py-2 border border-slate-200 rounded-lg bg-white"
+                                >
+                                  {journeyIconOptions.map((opt) => (
+                                    <option key={opt} value={opt}>
+                                      {opt}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="text"
+                                  value={item.text}
+                                  onChange={(e) => updateJourneyListItem('solutions', idx, { text: e.target.value })}
+                                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeJourneyListItem('solutions', idx)}
+                                  className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                                  title="Remove"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-bold text-slate-900">Timeline Steps</h3>
+                          <button
+                            type="button"
+                            onClick={() => openJourneyStepModal(null)}
+                            className="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm"
+                          >
+                            <Plus size={16} />
+                            Add Step
+                          </button>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-slate-50 border-b border-slate-200">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">Month</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">Title</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">Icon</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200">
+                              {(journeySettings.steps || []).map((step, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50">
+                                  <td className="px-4 py-3 text-sm font-medium text-slate-900">{step.month}</td>
+                                  <td className="px-4 py-3 text-sm text-slate-700">{step.title}</td>
+                                  <td className="px-4 py-3 text-sm text-slate-600">{step.iconName}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => openJourneyStepModal(idx)}
+                                        className="px-3 py-1.5 bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 text-xs font-medium flex items-center gap-1.5"
+                                      >
+                                        <Edit size={14} />
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteJourneyStep(idx)}
+                                        className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium flex items-center gap-1.5"
+                                      >
+                                        <Trash2 size={14} />
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <h2 className="text-2xl font-bold text-slate-900 mb-2">Journey Section Preview</h2>
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-6">
                       <ProblemSolution />
@@ -2400,6 +2900,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           onClose={() => {
             setIsClassFormOpen(false);
             setEditingClass(null);
+          }}
+        />
+      )}
+
+      {isJourneyStepModalOpen && journeySettings && (
+        <JourneyStepModal
+          step={
+            editingJourneyStepIndex !== null && journeySettings.steps?.[editingJourneyStepIndex]
+              ? journeySettings.steps[editingJourneyStepIndex]
+              : getDefaultJourneyStep()
+          }
+          iconOptions={journeyIconOptions}
+          isEditing={editingJourneyStepIndex !== null}
+          onSave={upsertJourneyStep}
+          onClose={() => {
+            setIsJourneyStepModalOpen(false);
+            setEditingJourneyStepIndex(null);
           }}
         />
       )}
@@ -3343,6 +3860,271 @@ const ResearchFormModal: React.FC<ResearchFormModalProps> = ({ topic, onSave, on
               className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
             >
               {topic ? 'Update' : 'Create'} Research Topic
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+interface JourneyStepModalProps {
+  step: JourneyTimelineStepSettings;
+  iconOptions: JourneyIconName[];
+  onSave: (step: JourneyTimelineStepSettings) => void;
+  onClose: () => void;
+  isEditing: boolean;
+}
+
+const JourneyStepModal: React.FC<JourneyStepModalProps> = ({ step, iconOptions, onSave, onClose, isEditing }) => {
+  const getInitial = (s: JourneyTimelineStepSettings): JourneyTimelineStepSettings => ({
+    month: s.month || '',
+    title: s.title || '',
+    outcomes: (s.outcomes && s.outcomes.length > 0 ? [...s.outcomes] : ['']).map((o) => o ?? ''),
+    iconName: s.iconName || 'Moon',
+    testimonial: {
+      text: s.testimonial?.text || '',
+      author: s.testimonial?.author || '',
+    },
+    metrics:
+      s.metrics && s.metrics.length > 0
+        ? s.metrics.map((m) => ({ label: m?.label || '', value: m?.value || '' }))
+        : [{ label: '', value: '' }],
+  });
+
+  const [formData, setFormData] = useState<JourneyTimelineStepSettings>(getInitial(step));
+
+  useEffect(() => {
+    setFormData(getInitial(step));
+  }, [step]);
+
+  const updateOutcome = (index: number, value: string) => {
+    const current = formData.outcomes && formData.outcomes.length > 0 ? [...formData.outcomes] : [''];
+    if (index >= current.length) current.push('');
+    current[index] = value;
+    setFormData({ ...formData, outcomes: current });
+  };
+
+  const addOutcome = () => {
+    const current = formData.outcomes && formData.outcomes.length > 0 ? formData.outcomes : [''];
+    setFormData({ ...formData, outcomes: [...current, ''] });
+  };
+
+  const removeOutcome = (index: number) => {
+    const current = formData.outcomes && formData.outcomes.length > 0 ? formData.outcomes : [''];
+    const next = current.filter((_, i) => i !== index);
+    setFormData({ ...formData, outcomes: next.length > 0 ? next : [''] });
+  };
+
+  const updateMetric = (index: number, field: 'label' | 'value', value: string) => {
+    const current = formData.metrics && formData.metrics.length > 0 ? [...formData.metrics] : [{ label: '', value: '' }];
+    if (index >= current.length) current.push({ label: '', value: '' });
+    current[index] = { ...current[index], [field]: value };
+    setFormData({ ...formData, metrics: current });
+  };
+
+  const addMetric = () => {
+    const current = formData.metrics && formData.metrics.length > 0 ? formData.metrics : [{ label: '', value: '' }];
+    setFormData({ ...formData, metrics: [...current, { label: '', value: '' }] });
+  };
+
+  const removeMetric = (index: number) => {
+    const current = formData.metrics && formData.metrics.length > 0 ? formData.metrics : [{ label: '', value: '' }];
+    const next = current.filter((_, i) => i !== index);
+    setFormData({ ...formData, metrics: next.length > 0 ? next : [{ label: '', value: '' }] });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.month.trim() || !formData.title.trim()) {
+      alert('Please fill in Month and Title.');
+      return;
+    }
+    onSave({
+      ...formData,
+      outcomes: (formData.outcomes || []).map((o) => (o || '').trim()).filter((o) => o.length > 0),
+      metrics: (formData.metrics || [])
+        .map((m) => ({ label: (m.label || '').trim(), value: (m.value || '').trim() }))
+        .filter((m) => m.label.length > 0 && m.value.length > 0),
+      testimonial: {
+        text: (formData.testimonial?.text || '').trim(),
+        author: (formData.testimonial?.author || '').trim(),
+      },
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto m-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 className="text-2xl font-bold text-slate-900">{isEditing ? 'Edit Timeline Step' : 'Add Timeline Step'}</h2>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-lg"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Month *</label>
+              <input
+                type="text"
+                required
+                value={formData.month}
+                onChange={(e) => setFormData({ ...formData, month: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                placeholder="e.g., Month 1"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Icon *</label>
+              <select
+                required
+                value={formData.iconName}
+                onChange={(e) => setFormData({ ...formData, iconName: e.target.value as JourneyIconName })}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              >
+                {iconOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Title *</label>
+            <input
+              type="text"
+              required
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Outcomes *</label>
+            {(formData.outcomes && formData.outcomes.length > 0 ? formData.outcomes : ['']).map((o, idx) => (
+              <div key={idx} className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  required={idx === 0}
+                  value={o}
+                  onChange={(e) => updateOutcome(idx, e.target.value)}
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  placeholder={`Outcome ${idx + 1}`}
+                />
+                {(formData.outcomes?.length || 0) > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeOutcome(idx)}
+                    className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addOutcome}
+              className="mt-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Outcome
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Testimonial Text</label>
+              <textarea
+                rows={4}
+                value={formData.testimonial.text}
+                onChange={(e) =>
+                  setFormData({ ...formData, testimonial: { ...formData.testimonial, text: e.target.value } })
+                }
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Testimonial Author</label>
+              <input
+                type="text"
+                value={formData.testimonial.author}
+                onChange={(e) =>
+                  setFormData({ ...formData, testimonial: { ...formData.testimonial, author: e.target.value } })
+                }
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                placeholder="e.g., Sarah J., 34"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Metrics</label>
+            {(formData.metrics && formData.metrics.length > 0 ? formData.metrics : [{ label: '', value: '' }]).map((m, idx) => (
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2 items-center">
+                <input
+                  type="text"
+                  value={m.label}
+                  onChange={(e) => updateMetric(idx, 'label', e.target.value)}
+                  className="md:col-span-2 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  placeholder="Label"
+                />
+                <input
+                  type="text"
+                  value={m.value}
+                  onChange={(e) => updateMetric(idx, 'value', e.target.value)}
+                  className="md:col-span-2 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  placeholder="Value"
+                />
+                <div className="md:col-span-1">
+                  {(formData.metrics?.length || 0) > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeMetric(idx)}
+                      className="w-full px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 flex items-center justify-center"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addMetric}
+              className="mt-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Metric
+            </button>
+          </div>
+
+          <div className="flex justify-end gap-4 pt-4 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+            >
+              Cancel
+            </button>
+            <button type="submit" className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+              {isEditing ? 'Update' : 'Add'} Step
             </button>
           </div>
         </form>
