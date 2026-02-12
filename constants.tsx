@@ -5,7 +5,7 @@ import { TimelinePhase, ClassSession, Instructor, PricingTier, YogaClass, Track,
 export const LOGO_URL = "https://res.cloudinary.com/dvue1idmp/image/upload/v1767086031/yoga_flow_tjmk50.jpg";
 
 export const HERO_METRICS = [
-  { label: 'Flexibility', value: '30 %', trend: 'up' as const },
+  { label: 'Flexibility', value: '30%', trend: 'up' as const },
   { label: 'Back Pain', value: '85%', trend: 'down' as const },
   { label: 'Core Strength', value: '3x', trend: 'up' as const },
 ];
