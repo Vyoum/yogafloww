@@ -74,7 +74,8 @@ service cloud.firestore {
     
     // Settings Collection - PERMISSIVE FOR TESTING
     match /settings/{documentId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
     
     match /class_videos/{documentId} {

@@ -154,10 +154,17 @@ export const Timeline: React.FC<TimelineProps> = ({ onNavPricing }) => {
 
   useEffect(() => {
     const settingsRef = doc(db, 'settings', 'app_settings');
-    const unsubscribe = onSnapshot(settingsRef, (snap) => {
-      const data = (snap.data() as any) || {};
-      setSettings((data.journey as JourneySettings) || null);
-    });
+    const unsubscribe = onSnapshot(
+      settingsRef,
+      (snap) => {
+        const data = (snap.data() as any) || {};
+        setSettings((data.journey as JourneySettings) || null);
+      },
+      (error) => {
+        console.error('❌ Journey settings read failed:', error);
+        setSettings(null);
+      }
+    );
     return unsubscribe;
   }, []);
 
