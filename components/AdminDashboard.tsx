@@ -7,8 +7,9 @@ import {
   Sparkles, Target, ChevronRight, X, ShieldCheck, Microscope, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../config/firebase';
+import { db, storage } from '../config/firebase';
 import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
+import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { DEFAULT_COMMUNITY_SETTINGS, getSettings, updateSettings } from '../utils/settings';
 import type { CommunityChatMessage, CommunityConversation, CommunitySettings } from '../utils/settings';
 import { LIVE_CLASSES, RECORDED_CLASSES, ASANAS, INSTRUCTORS, RESEARCH_TOPICS, PRICING_TIERS_INR, PRICING_TIERS_USD, PROBLEMS, SOLUTIONS, TIMELINE_STEPS } from '../constants';
@@ -3331,6 +3332,7 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
     achievements: [],
     experience: [],
   });
+  const [isUploadingInstructorImage, setIsUploadingInstructorImage] = useState(false);
 
   useEffect(() => {
     if (instructor) {
@@ -3352,8 +3354,57 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
     }
   }, [instructor]);
 
+  const getAvatarText = (name: string) => {
+    const compact = (name || '').replace(/\s+/g, '');
+    const firstTwo = compact.slice(0, 2).toUpperCase();
+    if (firstTwo.length === 2) return firstTwo;
+    const initials = (name || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+    return initials || firstTwo || 'IN';
+  };
+
+  const handleInstructorImageUpload = async (file: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+
+    const base = (formData.id || formData.name || 'instructor')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'instructor';
+
+    const safeName = (file.name || 'photo').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `instructors/${base}/${Date.now()}-${safeName}`;
+
+    try {
+      setIsUploadingInstructorImage(true);
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, file, { contentType: file.type });
+      const url = await getDownloadURL(fileRef);
+      setFormData((prev) => ({ ...prev, imageUrl: url }));
+    } catch (error: any) {
+      console.error('❌ Instructor image upload failed:', error);
+      alert(`Failed to upload image: ${error?.message || 'Please try again.'}`);
+    } finally {
+      setIsUploadingInstructorImage(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isUploadingInstructorImage) {
+      alert('Image upload in progress. Please wait.');
+      return;
+    }
     
     // Filter out empty array items
     const cleanSpecialties = (formData.specialties || []).filter(s => s.trim() !== '');
@@ -3369,6 +3420,7 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
     
     const finalInstructor: Instructor = {
       ...formData,
+      imageUrl: formData.imageUrl && formData.imageUrl.trim().length > 0 ? formData.imageUrl.trim() : undefined,
       specialties: cleanSpecialties,
       education: cleanEducation,
       achievements: cleanAchievements.length > 0 ? cleanAchievements : undefined,
@@ -3418,6 +3470,46 @@ const InstructorFormModal: React.FC<InstructorFormModalProps> = ({ instructor, o
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Photo</label>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-teal-50 overflow-hidden flex items-center justify-center text-teal-700 font-serif text-xl font-bold border border-slate-100">
+                {formData.imageUrl ? (
+                  <img src={formData.imageUrl} alt={formData.name || 'Instructor'} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{getAvatarText(formData.name)}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <label className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                  isUploadingInstructorImage ? 'bg-slate-200 text-slate-500' : 'bg-teal-600 text-white hover:bg-teal-700'
+                }`}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={isUploadingInstructorImage}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleInstructorImageUpload(file);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                  {isUploadingInstructorImage ? 'Uploading...' : 'Upload Photo'}
+                </label>
+                {formData.imageUrl && formData.imageUrl.trim().length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, imageUrl: undefined }))}
+                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Name *</label>

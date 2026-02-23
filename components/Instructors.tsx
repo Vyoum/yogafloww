@@ -62,8 +62,19 @@ export const Instructors: React.FC<InstructorsProps> = ({ onViewProfile }) => {
                   onClick={() => onViewProfile?.(instructor.id)}
                 >
                   <div className="flex items-start justify-between mb-10">
-                    <div className="w-20 h-20 rounded-[1.5rem] bg-teal-50 flex items-center justify-center text-teal-600 font-serif text-4xl font-bold shadow-sm transition-transform duration-700 group-hover:rotate-6">
-                      {instructor.name.split(' ').map(n => n[0]).join('')}
+                    <div className="w-20 h-20 rounded-[1.5rem] bg-teal-50 overflow-hidden flex items-center justify-center text-teal-600 font-serif text-4xl font-bold shadow-sm transition-transform duration-700 group-hover:rotate-6">
+                      {instructor.imageUrl ? (
+                        <img
+                          src={instructor.imageUrl}
+                          alt={instructor.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        (instructor.name || '')
+                          .replace(/\s+/g, '')
+                          .slice(0, 2)
+                          .toUpperCase()
+                      )}
                     </div>
                     <div className="text-teal-100 group-hover:text-teal-500 transition-all duration-700 scale-90 group-hover:scale-110">
                       <ShieldCheck size={40} strokeWidth={1.5} />

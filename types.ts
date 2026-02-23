@@ -103,6 +103,7 @@ export interface Instructor {
   role: string;
   lineage: string;
   bio: string;
+  imageUrl?: string;
   contact?: {
     phone: string;
     email: string;

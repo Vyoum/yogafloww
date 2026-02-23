@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -34,6 +35,7 @@ const googleProvider = new GoogleAuthProvider();
 
 // Initialize Cloud Firestore with connection settings
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // Configure Firestore settings for better timeout handling
 if (typeof window !== 'undefined' && isFirebaseConfigured) {
@@ -68,4 +70,4 @@ if (typeof window !== 'undefined' && isFirebaseConfigured && firebaseConfig.meas
   analytics = getAnalytics(app);
 }
 
-export { app, analytics, auth, googleProvider, db, isFirebaseConfigured };
+export { app, analytics, auth, googleProvider, db, storage, isFirebaseConfigured };

@@ -57,8 +57,19 @@ export const FullInstructors: React.FC<FullInstructorsProps> = ({ onBack, select
                 
                 {/* Left: Contact & Stats */}
                 <div className="space-y-10">
-                  <div className="w-32 h-32 rounded-3xl bg-teal-600 flex items-center justify-center text-white font-serif text-5xl font-bold shadow-xl">
-                    {instructor.name.split(' ').map(n => n[0]).join('')}
+                  <div className="w-32 h-32 rounded-3xl bg-teal-600 overflow-hidden flex items-center justify-center text-white font-serif text-5xl font-bold shadow-xl">
+                    {instructor.imageUrl ? (
+                      <img
+                        src={instructor.imageUrl}
+                        alt={instructor.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      (instructor.name || '')
+                        .replace(/\s+/g, '')
+                        .slice(0, 2)
+                        .toUpperCase()
+                    )}
                   </div>
                   
                   <div className="space-y-4">
