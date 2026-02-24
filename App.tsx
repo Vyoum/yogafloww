@@ -22,10 +22,11 @@ import { AuthProvider } from './contexts/AuthContext';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsConditions } from './components/TermsConditions';
 import { AdminDashboard } from './components/AdminDashboard';
+import { UserDashboard } from './components/UserDashboard';
 
 const AppContent: React.FC = () => {
   // Initialize view based on current path
-  const getInitialView = (): 'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms' | 'admin' => {
+  const getInitialView = (): 'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms' | 'admin' | 'dashboard' => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
       if (path === '/admin' || path === '/admin/') {
@@ -35,10 +36,11 @@ const AppContent: React.FC = () => {
     }
     return 'home';
   };
-  
-  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms' | 'admin'>(getInitialView());
+
+  const [view, setView] = useState<'home' | 'instructors' | 'classes' | 'about' | 'pricing' | 'community' | 'meditation' | 'asanas' | 'research' | 'privacy' | 'terms' | 'admin' | 'dashboard'>(getInitialView());
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
   const [classesInitialTab, setClassesInitialTab] = useState<'live' | 'recorded'>('live');
+  const [dashboardInitialTab, setDashboardInitialTab] = useState<'profile' | 'asanas' | 'classes' | 'subscription'>('profile');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -110,6 +112,12 @@ const AppContent: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
+  const handleNavDashboard = (tab?: 'profile' | 'asanas' | 'classes' | 'subscription') => {
+    if (tab) setDashboardInitialTab(tab);
+    setView('dashboard');
+    window.scrollTo(0, 0);
+  };
+
   const handleContactClick = () => {
     setView('home');
     setTimeout(() => {
@@ -146,7 +154,7 @@ const AppContent: React.FC = () => {
 
     // Back/forward buttons
     window.addEventListener('popstate', syncViewFromPath);
-    
+
     return () => {
       clearTimeout(timeoutId);
       window.removeEventListener('popstate', syncViewFromPath);
@@ -171,8 +179,8 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen bg-white text-slate-900 selection:bg-teal-100 selection:text-teal-900 antialiased">
       <CustomCursor />
       {view !== 'admin' && (
-        <Navbar 
-          onNavHome={handleNavHome} 
+        <Navbar
+          onNavHome={handleNavHome}
           onNavInstructors={handleNavInstructors}
           onNavClasses={handleNavClasses}
           onNavAbout={handleNavAbout}
@@ -182,43 +190,44 @@ const AppContent: React.FC = () => {
           onNavAsanas={handleNavAsanas}
           onNavResearch={handleNavResearch}
           onNavAdmin={handleNavAdmin}
+          onNavDashboard={handleNavDashboard}
           isHomePage={view === 'home'}
         />
       )}
-      
+
       <main>
         {view === 'home' && (
           <>
             <Hero onNavPricing={handleNavPricing} />
-            
+
             <div id="journey">
               <ProblemSolution />
               <Timeline onNavPricing={handleNavPricing} />
             </div>
 
             <WeeklySchedule onViewSampleClass={handleViewSampleClass} />
-            
+
             <Instructors onViewProfile={handleViewProfile} />
-            
+
             <div className="py-24 bg-slate-50">
-               <div className="max-w-7xl mx-auto px-6 text-center">
-                  <h2 className="text-4xl font-serif font-bold mb-6">Explore the Path</h2>
-                  <p className="text-slate-500 mb-10 max-w-2xl mx-auto">Master the foundational postures and understand the clinical research behind every movement.</p>
-                  <div className="flex flex-col sm:flex-row justify-center gap-6">
-                    <button 
-                      onClick={handleNavAsanas}
-                      className="bg-teal-600 text-white px-10 py-4 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-teal-700 transition-all shadow-xl"
-                    >
-                      Browse Asana Library
-                    </button>
-                    <button 
-                      onClick={handleNavResearch}
-                      className="bg-white text-teal-600 border border-teal-200 px-10 py-4 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-teal-50 transition-all shadow-xl"
-                    >
-                      View Scientific Research
-                    </button>
-                  </div>
-               </div>
+              <div className="max-w-7xl mx-auto px-6 text-center">
+                <h2 className="text-4xl font-serif font-bold mb-6">Explore the Path</h2>
+                <p className="text-slate-500 mb-10 max-w-2xl mx-auto">Master the foundational postures and understand the clinical research behind every movement.</p>
+                <div className="flex flex-col sm:flex-row justify-center gap-6">
+                  <button
+                    onClick={handleNavAsanas}
+                    className="bg-teal-600 text-white px-10 py-4 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-teal-700 transition-all shadow-xl"
+                  >
+                    Browse Asana Library
+                  </button>
+                  <button
+                    onClick={handleNavResearch}
+                    className="bg-white text-teal-600 border border-teal-200 px-10 py-4 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-teal-50 transition-all shadow-xl"
+                  >
+                    View Scientific Research
+                  </button>
+                </div>
+              </div>
             </div>
 
             <Contact />
@@ -240,20 +249,21 @@ const AppContent: React.FC = () => {
         {view === 'privacy' && <PrivacyPolicy onBack={handleNavHome} />}
         {view === 'terms' && <TermsConditions onBack={handleNavHome} />}
         {view === 'admin' && <AdminDashboard onBack={handleNavHome} />}
+        {view === 'dashboard' && <UserDashboard onBack={handleNavHome} initialTab={dashboardInitialTab} onNavAdmin={handleNavAdmin} />}
       </main>
-      
+
       {view !== 'admin' && (
-        <Footer 
-        onNavHome={handleNavHome} 
-        onNavInstructors={handleNavInstructors}
-        onNavClasses={handleNavClasses}
-        onNavAbout={handleNavAbout}
-        onNavPricing={handleNavPricing}
-        onNavCommunity={handleNavCommunity}
-        onNavPrivacy={handleNavPrivacy}
-        onNavTerms={handleNavTerms}
-        isHomePage={view === 'home'}
-      />
+        <Footer
+          onNavHome={handleNavHome}
+          onNavInstructors={handleNavInstructors}
+          onNavClasses={handleNavClasses}
+          onNavAbout={handleNavAbout}
+          onNavPricing={handleNavPricing}
+          onNavCommunity={handleNavCommunity}
+          onNavPrivacy={handleNavPrivacy}
+          onNavTerms={handleNavTerms}
+          isHomePage={view === 'home'}
+        />
       )}
     </div>
   );

@@ -105,6 +105,14 @@ service cloud.firestore {
     match /app_settings/{documentId} {
       allow read, write: if true;
     }
+
+    match /community_conversations/{conversationId} {
+      allow read, write: if true;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
     
     // Default deny rule for any other collections
     match /{document=**} {

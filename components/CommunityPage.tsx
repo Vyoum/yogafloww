@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Reveal } from './Reveal';
 import { Search, Plus, MessageSquare, Users, Settings, Info, Send, Smile, Paperclip, X, FileText, Heart, Shield } from 'lucide-react';
 import { db } from '../config/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { DEFAULT_COMMUNITY_SETTINGS, type CommunityChatMessage, type CommunityConversation, type CommunitySettings } from '../utils/settings';
 
 export const CommunityPage: React.FC = () => {
@@ -17,6 +17,7 @@ export const CommunityPage: React.FC = () => {
   const [welcomeSubtitle, setWelcomeSubtitle] = useState<string>(DEFAULT_COMMUNITY_SETTINGS.welcomeSubtitle);
   const [conversations, setConversations] = useState<CommunityConversation[]>(DEFAULT_COMMUNITY_SETTINGS.conversations);
   const [chatHistories, setChatHistories] = useState<Record<string, CommunityChatMessage[]>>(DEFAULT_COMMUNITY_SETTINGS.histories);
+  const [liveMessages, setLiveMessages] = useState<CommunityChatMessage[] | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachedFile, setAttachedFile] = useState<{ name: string; type: string } | null>(null);
   
@@ -58,7 +59,49 @@ export const CommunityPage: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  const handleSendMessage = () => {
+  useEffect(() => {
+    if (!selectedId) {
+      setLiveMessages(null);
+      return;
+    }
+
+    const messagesRef = collection(db, 'community_conversations', selectedId, 'messages');
+    const q = query(messagesRef, orderBy('createdAt', 'asc'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const next = snapshot.docs.map((d) => {
+          const data = d.data() as any;
+          const createdAt = data.createdAt?.toDate?.();
+          const time =
+            typeof data.time === 'string' && data.time.trim().length > 0
+              ? data.time
+              : createdAt
+                ? createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '';
+
+          return {
+            id: d.id,
+            sender: typeof data.sender === 'string' ? data.sender : 'Unknown',
+            avatar: typeof data.avatar === 'string' ? data.avatar : '',
+            text: typeof data.text === 'string' ? data.text : '',
+            time,
+            isMe: !!data.isMe,
+            attachment: data.attachment && typeof data.attachment === 'object' ? data.attachment : undefined,
+          } satisfies CommunityChatMessage;
+        });
+        setLiveMessages(next);
+      },
+      (error) => {
+        console.error('Error listening to community messages:', error);
+        setLiveMessages(null);
+      }
+    );
+
+    return unsubscribe;
+  }, [selectedId]);
+
+  const handleSendMessage = async () => {
     if ((!inputText.trim() && !attachedFile) || !selectedId) return;
 
     const newMessage: CommunityChatMessage = {
@@ -71,14 +114,34 @@ export const CommunityPage: React.FC = () => {
       attachment: attachedFile || undefined
     };
 
-    setChatHistories(prev => ({
-      ...prev,
-      [selectedId]: [...(prev[selectedId] || []), newMessage]
-    }));
+    try {
+      await addDoc(collection(db, 'community_conversations', selectedId, 'messages'), {
+        sender: newMessage.sender,
+        avatar: newMessage.avatar,
+        text: newMessage.text,
+        time: newMessage.time,
+        isMe: newMessage.isMe,
+        attachment: newMessage.attachment || null,
+        createdAt: serverTimestamp(),
+      });
 
-    setInputText('');
-    setAttachedFile(null);
-    setShowEmojiPicker(false);
+      setConversations((prev) =>
+        prev.map((c) => (c.id === selectedId ? { ...c, lastText: newMessage.text || c.lastText, time: newMessage.time, unreadCount: 0 } : c))
+      );
+
+      setInputText('');
+      setAttachedFile(null);
+      setShowEmojiPicker(false);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setChatHistories(prev => ({
+        ...prev,
+        [selectedId]: [...(prev[selectedId] || []), newMessage]
+      }));
+      setInputText('');
+      setAttachedFile(null);
+      setShowEmojiPicker(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -107,7 +170,7 @@ export const CommunityPage: React.FC = () => {
   }).filter(m => m.author.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const selectedConversation = conversations.find(m => m.id === selectedId);
-  const currentMessages = selectedId ? (chatHistories[selectedId] || []) : [];
+  const currentMessages = selectedId ? (liveMessages ?? (chatHistories[selectedId] || [])) : [];
 
   const commonEmojis = ['🙏', '🧘‍♀️', '✨', '🌿', '🕉️', '🔥', '💧', '🌙', '❤️', '🙌'];
 

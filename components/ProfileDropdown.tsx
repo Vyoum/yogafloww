@@ -6,9 +6,10 @@ interface ProfileDropdownProps {
   isOpen: boolean;
   onClose: () => void;
   onNavAdmin?: () => void;
+  onNavDashboard?: (tab?: 'profile' | 'asanas' | 'classes' | 'subscription') => void;
 }
 
-export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose, onNavAdmin }) => {
+export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose, onNavAdmin, onNavDashboard }) => {
   const { user, logout, isAdmin, isAdminChecking } = useAuth();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +73,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClos
           className="flex items-center gap-3 px-6 py-3 text-slate-700 hover:bg-teal-50 transition-colors"
           onClick={(e) => {
             e.preventDefault();
+            if (onNavDashboard) onNavDashboard('profile');
             onClose();
           }}
         >
@@ -83,6 +85,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClos
           className="flex items-center gap-3 px-6 py-3 text-slate-700 hover:bg-teal-50 transition-colors"
           onClick={(e) => {
             e.preventDefault();
+            if (onNavDashboard) onNavDashboard('classes');
             onClose();
           }}
         >
@@ -94,6 +97,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClos
           className="flex items-center gap-3 px-6 py-3 text-slate-700 hover:bg-teal-50 transition-colors"
           onClick={(e) => {
             e.preventDefault();
+            if (onNavDashboard) onNavDashboard('subscription');
             onClose();
           }}
         >
@@ -105,6 +109,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClos
           className="flex items-center gap-3 px-6 py-3 text-slate-700 hover:bg-teal-50 transition-colors"
           onClick={(e) => {
             e.preventDefault();
+            if (onNavDashboard) onNavDashboard('profile');
             onClose();
           }}
         >
