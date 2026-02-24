@@ -37,6 +37,9 @@ interface UserData {
   email: string;
   joinDate?: string;
   plan?: string;
+  role?: string;
+  isAdmin?: boolean;
+  roles?: string[];
   source: 'firebase' | 'localStorage';
   lastLogin?: string;
 }
@@ -218,6 +221,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
             email: data.email || '',
             joinDate: data.joinDate || data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
             plan: data.plan || null,
+            role: typeof data.role === 'string' ? data.role : undefined,
+            isAdmin: data.isAdmin === true,
+            roles: Array.isArray(data.roles) ? data.roles : undefined,
             lastLogin: data.lastLoginAt?.toDate?.()?.toISOString() || null,
             source: 'firebase' as const,
           };
@@ -520,6 +526,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     const matchesFilter = userFilter === 'all' || u.source === userFilter;
     return matchesSearch && matchesFilter;
   });
+
+  const isUserAdmin = (u: UserData) => {
+    return u.role === 'admin' || u.isAdmin === true || (Array.isArray(u.roles) && u.roles.includes('admin'));
+  };
+
+  const setUserAdmin = async (target: UserData, makeAdmin: boolean) => {
+    if (target.source !== 'firebase') {
+      alert('This user is from localStorage and cannot be updated in Firestore.');
+      return;
+    }
+
+    const label = makeAdmin ? 'make this user an admin' : 'remove admin access from this user';
+    if (!confirm(`Are you sure you want to ${label}?`)) return;
+
+    try {
+      const userRef = doc(db, 'users', target.id);
+      await setDoc(
+        userRef,
+        {
+          role: makeAdmin ? 'admin' : 'user',
+          isAdmin: makeAdmin,
+          roles: makeAdmin ? ['admin'] : [],
+        },
+        { merge: true }
+      );
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === target.id
+            ? { ...u, role: makeAdmin ? 'admin' : 'user', isAdmin: makeAdmin, roles: makeAdmin ? ['admin'] : [] }
+            : u
+        )
+      );
+    } catch (error: any) {
+      console.error('❌ Error updating admin role:', error);
+      alert(`Failed to update admin role: ${error?.message || 'Please try again.'}`);
+    }
+  };
 
   const filteredContacts = contactSubmissions.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1714,6 +1758,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                                     </button>
                                     <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
                                       <Edit size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => setUserAdmin(user, !isUserAdmin(user))}
+                                      disabled={user.source !== 'firebase'}
+                                      title={user.source !== 'firebase' ? 'Only Firebase users can be updated' : isUserAdmin(user) ? 'Remove admin' : 'Make admin'}
+                                      className={`p-2 transition-colors ${
+                                        user.source !== 'firebase'
+                                          ? 'text-slate-200 cursor-not-allowed'
+                                          : isUserAdmin(user)
+                                            ? 'text-teal-600 hover:text-teal-700'
+                                            : 'text-slate-400 hover:text-teal-600'
+                                      }`}
+                                    >
+                                      <Shield size={16} />
                                     </button>
                                   </div>
                                 </td>

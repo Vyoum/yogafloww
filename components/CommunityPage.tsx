@@ -1,12 +1,15 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Reveal } from './Reveal';
 import { Search, Plus, MessageSquare, Users, Settings, Info, Send, Smile, Paperclip, X, FileText, Heart, Shield } from 'lucide-react';
 import { db } from '../config/firebase';
-import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
 import { DEFAULT_COMMUNITY_SETTINGS, type CommunityChatMessage, type CommunityConversation, type CommunitySettings } from '../utils/settings';
+import { useAuth } from '../contexts/AuthContext';
 
 export const CommunityPage: React.FC = () => {
+  const { user } = useAuth();
+  const currentUserId = (user as any)?.id || '';
   const [activeTab, setActiveTab] = useState<'All' | 'Direct' | 'Groups'>('All');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -15,14 +18,30 @@ export const CommunityPage: React.FC = () => {
   const [pageSubtitle, setPageSubtitle] = useState<string>(DEFAULT_COMMUNITY_SETTINGS.pageSubtitle);
   const [welcomeTitle, setWelcomeTitle] = useState<string>(DEFAULT_COMMUNITY_SETTINGS.welcomeTitle);
   const [welcomeSubtitle, setWelcomeSubtitle] = useState<string>(DEFAULT_COMMUNITY_SETTINGS.welcomeSubtitle);
-  const [conversations, setConversations] = useState<CommunityConversation[]>(DEFAULT_COMMUNITY_SETTINGS.conversations);
+  const [settingsConversations, setSettingsConversations] = useState<CommunityConversation[]>(DEFAULT_COMMUNITY_SETTINGS.conversations);
+  const [dynamicConversations, setDynamicConversations] = useState<CommunityConversation[]>([]);
   const [chatHistories, setChatHistories] = useState<Record<string, CommunityChatMessage[]>>(DEFAULT_COMMUNITY_SETTINGS.histories);
   const [liveMessages, setLiveMessages] = useState<CommunityChatMessage[] | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachedFile, setAttachedFile] = useState<{ name: string; type: string } | null>(null);
+  const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
+  const [newChatName, setNewChatName] = useState('');
+  const [newChatKind, setNewChatKind] = useState<'direct' | 'group'>('direct');
+  const [newChatMembers, setNewChatMembers] = useState(2);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const mergedConversations = useMemo(() => {
+    const byId = new Map<string, CommunityConversation>();
+    settingsConversations.forEach((c) => byId.set(c.id, c));
+    dynamicConversations.forEach((c) => {
+      const existing = byId.get(c.id);
+      byId.set(c.id, existing ? { ...existing, ...c } : c);
+    });
+    return Array.from(byId.values());
+  }, [dynamicConversations, settingsConversations]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -30,7 +49,42 @@ export const CommunityPage: React.FC = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [selectedId, chatHistories]);
+  }, [selectedId, chatHistories, liveMessages]);
+
+  useEffect(() => {
+    const convRef = collection(db, 'community_conversations');
+    const unsubscribe = onSnapshot(
+      convRef,
+      (snapshot) => {
+        const next = snapshot.docs.map((d) => {
+          const data = d.data() as any;
+          const author = typeof data.author === 'string' && data.author.trim().length > 0 ? data.author : 'New Chat';
+          const avatarRaw =
+            typeof data.avatar === 'string' && data.avatar.trim().length > 0
+              ? data.avatar
+              : author.replace(/\s+/g, '').slice(0, 2).toUpperCase();
+          const members = typeof data.members === 'number' && Number.isFinite(data.members) ? data.members : undefined;
+
+          return {
+            id: d.id,
+            author,
+            avatar: avatarRaw,
+            lastText: typeof data.lastText === 'string' ? data.lastText : '',
+            time: typeof data.time === 'string' ? data.time : 'Just now',
+            unreadCount: typeof data.unreadCount === 'number' ? data.unreadCount : undefined,
+            isGroup: !!data.isGroup,
+            members,
+            isSupportGroup: !!data.isSupportGroup,
+          } satisfies CommunityConversation;
+        });
+        setDynamicConversations(next);
+      },
+      (error) => {
+        console.error('Error listening to community conversations:', error);
+      }
+    );
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const settingsRef = doc(db, 'settings', 'app_settings');
@@ -46,7 +100,7 @@ export const CommunityPage: React.FC = () => {
         if (typeof community.welcomeTitle === 'string') setWelcomeTitle(community.welcomeTitle);
         if (typeof community.welcomeSubtitle === 'string') setWelcomeSubtitle(community.welcomeSubtitle);
         if (Array.isArray(community.conversations) && community.conversations.length > 0) {
-          setConversations(community.conversations as CommunityConversation[]);
+          setSettingsConversations(community.conversations as CommunityConversation[]);
         }
         if (community.histories && typeof community.histories === 'object') {
           setChatHistories(community.histories as Record<string, CommunityChatMessage[]>);
@@ -72,6 +126,7 @@ export const CommunityPage: React.FC = () => {
       (snapshot) => {
         const next = snapshot.docs.map((d) => {
           const data = d.data() as any;
+          const senderId = typeof data.senderId === 'string' ? data.senderId : '';
           const createdAt = data.createdAt?.toDate?.();
           const time =
             typeof data.time === 'string' && data.time.trim().length > 0
@@ -86,7 +141,7 @@ export const CommunityPage: React.FC = () => {
             avatar: typeof data.avatar === 'string' ? data.avatar : '',
             text: typeof data.text === 'string' ? data.text : '',
             time,
-            isMe: !!data.isMe,
+            isMe: senderId && currentUserId ? senderId === currentUserId : !!data.isMe,
             attachment: data.attachment && typeof data.attachment === 'object' ? data.attachment : undefined,
           } satisfies CommunityChatMessage;
         });
@@ -99,15 +154,72 @@ export const CommunityPage: React.FC = () => {
     );
 
     return unsubscribe;
-  }, [selectedId]);
+  }, [currentUserId, selectedId]);
+
+  const handleCreateChat = async () => {
+    const name = newChatName.trim();
+    if (!name) {
+      alert('Please enter a name for the chat.');
+      return;
+    }
+    if (newChatKind === 'group' && (!Number.isFinite(newChatMembers) || newChatMembers < 2)) {
+      alert('Group chats must have at least 2 members.');
+      return;
+    }
+
+    const avatar = name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'CH';
+
+    try {
+      setIsCreatingChat(true);
+      const convDoc = await addDoc(collection(db, 'community_conversations'), {
+        author: name,
+        avatar,
+        isGroup: newChatKind === 'group',
+        members: newChatKind === 'group' ? newChatMembers : undefined,
+        isSupportGroup: false,
+        lastText: '',
+        time: 'Just now',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setSelectedId(convDoc.id);
+      setIsNewChatModalOpen(false);
+      setNewChatName('');
+      setNewChatKind('direct');
+      setNewChatMembers(2);
+    } catch (error: any) {
+      console.error('Error creating chat:', error);
+      alert(`Failed to create chat: ${error?.message || 'Please try again.'}`);
+    } finally {
+      setIsCreatingChat(false);
+    }
+  };
 
   const handleSendMessage = async () => {
     if ((!inputText.trim() && !attachedFile) || !selectedId) return;
 
+    const senderName = (user?.name || 'Me').trim() || 'Me';
+    const avatar =
+      senderName
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'ME';
+    const senderId = (user as any)?.id || '';
+
     const newMessage: CommunityChatMessage = {
       id: Date.now().toString(),
-      sender: 'Me',
-      avatar: 'ME',
+      sender: senderName,
+      avatar,
       text: inputText,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isMe: true,
@@ -118,15 +230,18 @@ export const CommunityPage: React.FC = () => {
       await addDoc(collection(db, 'community_conversations', selectedId, 'messages'), {
         sender: newMessage.sender,
         avatar: newMessage.avatar,
+        senderId,
         text: newMessage.text,
         time: newMessage.time,
-        isMe: newMessage.isMe,
+        isMe: true,
         attachment: newMessage.attachment || null,
         createdAt: serverTimestamp(),
       });
 
-      setConversations((prev) =>
-        prev.map((c) => (c.id === selectedId ? { ...c, lastText: newMessage.text || c.lastText, time: newMessage.time, unreadCount: 0 } : c))
+      await setDoc(
+        doc(db, 'community_conversations', selectedId),
+        { lastText: newMessage.text || '', time: newMessage.time, updatedAt: serverTimestamp() },
+        { merge: true }
       );
 
       setInputText('');
@@ -163,13 +278,13 @@ export const CommunityPage: React.FC = () => {
     setShowEmojiPicker(false);
   };
 
-  const filteredConversations = conversations.filter(m => {
+  const filteredConversations = mergedConversations.filter(m => {
     if (activeTab === 'Direct') return !m.isGroup;
     if (activeTab === 'Groups') return m.isGroup;
     return true;
   }).filter(m => m.author.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const selectedConversation = conversations.find(m => m.id === selectedId);
+  const selectedConversation = mergedConversations.find(m => m.id === selectedId);
   const currentMessages = selectedId ? (liveMessages ?? (chatHistories[selectedId] || [])) : [];
 
   const commonEmojis = ['🙏', '🧘‍♀️', '✨', '🌿', '🕉️', '🔥', '💧', '🌙', '❤️', '🙌'];
@@ -195,6 +310,7 @@ export const CommunityPage: React.FC = () => {
                 <h2 className="text-xl font-serif font-bold text-slate-900">Messages</h2>
                 <div className="flex gap-2">
                   <button 
+                    onClick={() => setIsNewChatModalOpen(true)}
                     className="p-2 bg-teal-500 text-white rounded-full hover:bg-teal-600 transition-colors shadow-lg shadow-teal-500/20"
                     title="New conversation"
                   >
@@ -519,6 +635,95 @@ export const CommunityPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {isNewChatModalOpen && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setIsNewChatModalOpen(false);
+            }}
+          >
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg m-4 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-xl font-bold text-slate-900">New Chat</h3>
+                <button
+                  onClick={() => setIsNewChatModalOpen(false)}
+                  className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setNewChatKind('direct')}
+                    className={`px-4 py-3 rounded-xl border text-sm font-bold transition-colors ${
+                      newChatKind === 'direct' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    Direct
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewChatKind('group')}
+                    className={`px-4 py-3 rounded-xl border text-sm font-bold transition-colors ${
+                      newChatKind === 'group' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    Group
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    {newChatKind === 'group' ? 'Group name' : 'Person name'}
+                  </label>
+                  <input
+                    value={newChatName}
+                    onChange={(e) => setNewChatName(e.target.value)}
+                    placeholder={newChatKind === 'group' ? 'e.g., Morning Circle' : 'e.g., Rahul'}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none"
+                  />
+                </div>
+
+                {newChatKind === 'group' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Members</label>
+                    <input
+                      type="number"
+                      min={2}
+                      value={newChatMembers}
+                      onChange={(e) => setNewChatMembers(Number(e.target.value))}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none"
+                    />
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsNewChatModalOpen(false)}
+                    className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateChat}
+                    disabled={isCreatingChat}
+                    className={`px-5 py-2.5 rounded-xl font-bold transition-colors ${
+                      isCreatingChat ? 'bg-slate-200 text-slate-500' : 'bg-teal-600 text-white hover:bg-teal-700'
+                    }`}
+                  >
+                    {isCreatingChat ? 'Creating...' : 'Create'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

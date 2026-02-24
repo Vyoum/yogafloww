@@ -42,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [shouldNavigateToPricing, setShouldNavigateToPricing] = useState(false);
+  const [shouldNavigateToDashboard, setShouldNavigateToDashboard] = useState(false);
   const { isAuthenticated, user } = useAuth();
 
   // Navigate to pricing after successful login if triggered from "Start Free Month"
@@ -51,6 +52,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       onNavPricing();
     }
   }, [isAuthenticated, shouldNavigateToPricing, onNavPricing]);
+
+  useEffect(() => {
+    if (isAuthenticated && shouldNavigateToDashboard) {
+      setShouldNavigateToDashboard(false);
+      onNavDashboard?.('profile');
+    }
+  }, [isAuthenticated, shouldNavigateToDashboard, onNavDashboard]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -156,8 +164,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={() => {
                 if (isAuthenticated) {
-                  setIsProfileDropdownOpen(!isProfileDropdownOpen);
+                  if (onNavDashboard) {
+                    setIsProfileDropdownOpen(false);
+                    onNavDashboard('profile');
+                  } else {
+                    setIsProfileDropdownOpen(!isProfileDropdownOpen);
+                  }
                 } else {
+                  setShouldNavigateToDashboard(true);
                   setIsLoginModalOpen(true);
                 }
               }}
@@ -272,6 +286,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setIsProfileDropdownOpen(true);
                   }
                 } else {
+                  setShouldNavigateToDashboard(true);
                   setIsLoginModalOpen(true);
                 }
               }}
@@ -304,6 +319,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         onClose={() => {
           setIsLoginModalOpen(false);
           setShouldNavigateToPricing(false);
+          setShouldNavigateToDashboard(false);
         }}
         onSwitchToSignup={() => {
           setIsLoginModalOpen(false);
@@ -315,6 +331,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         onClose={() => {
           setIsSignupModalOpen(false);
           setShouldNavigateToPricing(false);
+          setShouldNavigateToDashboard(false);
         }}
         onSwitchToLogin={() => {
           setIsSignupModalOpen(false);
