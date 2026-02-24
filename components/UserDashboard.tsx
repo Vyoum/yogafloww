@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './Button';
+import { db } from '../config/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import {
     User,
     Calendar,
@@ -13,7 +15,6 @@ import {
     Video,
     LogOut,
     MapPin,
-    Star,
     Shield
 } from 'lucide-react';
 
@@ -28,12 +29,57 @@ type TabType = 'profile' | 'asanas' | 'classes' | 'subscription';
 export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab = 'profile', onNavAdmin }) => {
     const { user, logout, isAdmin, isAdminChecking } = useAuth();
     const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+    const [subscription, setSubscription] = useState<any | null>(null);
+    const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+    const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     };
+
+    const formatTimestampDate = (value: any) => {
+        if (!value) return 'N/A';
+        const date = value?.toDate?.();
+        if (date instanceof Date && !Number.isNaN(date.getTime())) {
+            return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        }
+        if (typeof value === 'string') {
+            return formatDate(value);
+        }
+        return 'N/A';
+    };
+
+    useEffect(() => {
+        if (activeTab !== 'subscription') return;
+        if (!user?.id) {
+            setSubscription(null);
+            setSubscriptionError(null);
+            setSubscriptionLoading(false);
+            return;
+        }
+
+        setSubscriptionLoading(true);
+        setSubscriptionError(null);
+
+        const ref = doc(db, 'subscription', user.id);
+        const unsubscribe = onSnapshot(
+            ref,
+            (snap) => {
+                setSubscription(snap.exists() ? snap.data() : null);
+                setSubscriptionLoading(false);
+            },
+            (error) => {
+                console.error('Error loading subscription:', error);
+                setSubscription(null);
+                setSubscriptionLoading(false);
+                setSubscriptionError(error?.message || 'Failed to load subscription.');
+            }
+        );
+
+        return () => unsubscribe();
+    }, [activeTab, user?.id]);
 
     const handleLogout = () => {
         logout();
@@ -312,80 +358,89 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab
                                 <div className="space-y-8">
                                     <div>
                                         <h2 className="text-2xl font-serif font-bold text-slate-900 mb-2">Subscription & Billing</h2>
-                                        <p className="text-slate-500">Manage your membership plan and payment methods.</p>
+                                        <p className="text-slate-500">Your current plan and billing status.</p>
                                     </div>
 
-                                    <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
-                                        {/* Decorative elements */}
-                                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-                                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-400/20 rounded-full blur-2xl translate-y-1/3 -translate-x-1/4"></div>
-
-                                        <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                                            <div>
-                                                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold tracking-wider uppercase mb-4">
-                                                    <Star size={12} className="fill-current" /> Active Plan
-                                                </div>
-                                                <h3 className="font-serif text-3xl font-bold mb-1">
-                                                    {user?.plan === 'premium' ? 'Premium Annual' : 'Explorer Monthly'}
-                                                </h3>
-                                                <p className="text-teal-100">
-                                                    {user?.plan === 'premium' ? '$199.00 / year' : '$29.00 / month'}
-                                                </p>
-                                            </div>
-
-                                            <div className="text-left md:text-right">
-                                                <p className="text-teal-100 text-sm mb-1">Next billing date</p>
-                                                <p className="text-xl font-bold">Nov 24, 2026</p>
-                                            </div>
+                                    {subscriptionLoading ? (
+                                        <div className="p-10 bg-slate-50 rounded-3xl border border-slate-100 text-slate-600">
+                                            Loading subscription...
                                         </div>
-                                    </div>
-
-                                    <div className="grid md:grid-cols-2 gap-6 mt-8">
-                                        <div className="p-6 border border-slate-100 rounded-2xl">
-                                            <div className="flex items-center justify-between mb-6">
-                                                <h4 className="font-bold text-slate-900">Payment Method</h4>
-                                                <button className="text-teal-600 text-sm font-medium hover:underline">Edit</button>
-                                            </div>
-                                            <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50">
-                                                <div className="w-12 h-8 bg-slate-800 rounded flex items-center justify-center text-white text-xs font-bold font-mono">
-                                                    VISA
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-slate-900">•••• •••• •••• 4242</p>
-                                                    <p className="text-xs text-slate-500">Expires 12/28</p>
-                                                </div>
-                                            </div>
+                                    ) : subscriptionError ? (
+                                        <div className="p-10 bg-red-50 rounded-3xl border border-red-100 text-red-700">
+                                            {subscriptionError}
                                         </div>
+                                    ) : subscription ? (
+                                        <div className="space-y-6">
+                                            <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+                                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+                                                <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-400/20 rounded-full blur-2xl translate-y-1/3 -translate-x-1/4"></div>
 
-                                        <div className="p-6 border border-slate-100 rounded-2xl">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h4 className="font-bold text-slate-900">Billing History</h4>
-                                                <button className="text-teal-600 text-sm font-medium hover:underline">View All</button>
-                                            </div>
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between text-sm">
+                                                <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
                                                     <div>
-                                                        <p className="font-medium text-slate-900">Oct 24, 2026</p>
-                                                        <p className="text-slate-500">Explorer Monthly</p>
+                                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold tracking-wider uppercase mb-4">
+                                                            {(subscription.status || 'unknown').toString()}
+                                                        </div>
+                                                        <h3 className="font-serif text-3xl font-bold mb-1">
+                                                            {(subscription.planType || user?.plan || 'Subscription').toString()}
+                                                        </h3>
+                                                        {subscription.planFrequency && (
+                                                            <p className="text-teal-100">
+                                                                {(subscription.planFrequency || '').toString()}
+                                                            </p>
+                                                        )}
                                                     </div>
-                                                    <span className="font-medium">$29.00</span>
+
+                                                    <div className="text-left md:text-right">
+                                                        <p className="text-teal-100 text-sm mb-1">Current period ends</p>
+                                                        <p className="text-xl font-bold">{formatTimestampDate(subscription.currentPeriodEnd)}</p>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <div>
-                                                        <p className="font-medium text-slate-900">Sep 24, 2026</p>
-                                                        <p className="text-slate-500">Explorer Monthly</p>
+                                            </div>
+
+                                            <div className="grid md:grid-cols-2 gap-6">
+                                                <div className="p-6 border border-slate-100 rounded-2xl">
+                                                    <h4 className="font-bold text-slate-900 mb-4">Billing</h4>
+                                                    <div className="space-y-3 text-sm">
+                                                        <div className="flex items-center justify-between gap-4">
+                                                            <span className="text-slate-500">Status</span>
+                                                            <span className="font-medium text-slate-900">{(subscription.status || 'unknown').toString()}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-4">
+                                                            <span className="text-slate-500">Last payment ID</span>
+                                                            <span className="font-medium text-slate-900 truncate max-w-[220px]">{(subscription.paymentId || 'N/A').toString()}</span>
+                                                        </div>
                                                     </div>
-                                                    <span className="font-medium">$29.00</span>
+                                                </div>
+
+                                                <div className="p-6 border border-slate-100 rounded-2xl">
+                                                    <h4 className="font-bold text-slate-900 mb-4">Invoices</h4>
+                                                    <p className="text-sm text-slate-500">
+                                                        Billing history and payment method are available via the payment provider.
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div className="flex justify-center pt-4">
-                                        <Button variant="outline" className="text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700">
-                                            Cancel Subscription
-                                        </Button>
-                                    </div>
+                                    ) : (
+                                        <div className="p-10 bg-slate-50 rounded-3xl border border-slate-100 text-slate-700">
+                                            <p className="font-bold mb-2">No active subscription found.</p>
+                                            <p className="text-sm text-slate-500 mb-6">
+                                                Subscribe from the Pricing section to unlock full access.
+                                            </p>
+                                            <Button
+                                                variant="primary"
+                                                className="rounded-full"
+                                                onClick={() => {
+                                                    onBack();
+                                                    setTimeout(() => {
+                                                        const el = document.getElementById('pricing');
+                                                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                                    }, 150);
+                                                }}
+                                            >
+                                                View Pricing
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
