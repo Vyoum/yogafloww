@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Reveal } from './Reveal';
-import { Search, Plus, MessageSquare, Users, Settings, Info, Send, Smile, Paperclip, X, FileText, Heart, Shield } from 'lucide-react';
+import { Search, MessageSquare, Users, Settings, Info, Send, Smile, Paperclip, X, FileText, Heart, Shield } from 'lucide-react';
 import { db } from '../config/firebase';
 import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
 import { DEFAULT_COMMUNITY_SETTINGS, type CommunityChatMessage, type CommunityConversation, type CommunitySettings } from '../utils/settings';
@@ -24,11 +24,6 @@ export const CommunityPage: React.FC = () => {
   const [liveMessages, setLiveMessages] = useState<CommunityChatMessage[] | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachedFile, setAttachedFile] = useState<{ name: string; type: string } | null>(null);
-  const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
-  const [newChatName, setNewChatName] = useState('');
-  const [newChatKind, setNewChatKind] = useState<'direct' | 'group'>('direct');
-  const [newChatMembers, setNewChatMembers] = useState(2);
-  const [isCreatingChat, setIsCreatingChat] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -156,52 +151,6 @@ export const CommunityPage: React.FC = () => {
     return unsubscribe;
   }, [currentUserId, selectedId]);
 
-  const handleCreateChat = async () => {
-    const name = newChatName.trim();
-    if (!name) {
-      alert('Please enter a name for the chat.');
-      return;
-    }
-    if (newChatKind === 'group' && (!Number.isFinite(newChatMembers) || newChatMembers < 2)) {
-      alert('Group chats must have at least 2 members.');
-      return;
-    }
-
-    const avatar = name
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((n) => n[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || 'CH';
-
-    try {
-      setIsCreatingChat(true);
-      const convDoc = await addDoc(collection(db, 'community_conversations'), {
-        author: name,
-        avatar,
-        isGroup: newChatKind === 'group',
-        members: newChatKind === 'group' ? newChatMembers : undefined,
-        isSupportGroup: false,
-        lastText: '',
-        time: 'Just now',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      setSelectedId(convDoc.id);
-      setIsNewChatModalOpen(false);
-      setNewChatName('');
-      setNewChatKind('direct');
-      setNewChatMembers(2);
-    } catch (error: any) {
-      console.error('Error creating chat:', error);
-      alert(`Failed to create chat: ${error?.message || 'Please try again.'}`);
-    } finally {
-      setIsCreatingChat(false);
-    }
-  };
-
   const handleSendMessage = async () => {
     if ((!inputText.trim() && !attachedFile) || !selectedId) return;
 
@@ -308,15 +257,6 @@ export const CommunityPage: React.FC = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-serif font-bold text-slate-900">Messages</h2>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setIsNewChatModalOpen(true)}
-                    className="p-2 bg-teal-500 text-white rounded-full hover:bg-teal-600 transition-colors shadow-lg shadow-teal-500/20"
-                    title="New conversation"
-                  >
-                    <Plus size={20} />
-                  </button>
-                </div>
               </div>
 
               <div className="relative mb-6">
@@ -636,94 +576,6 @@ export const CommunityPage: React.FC = () => {
           </div>
         </div>
 
-        {isNewChatModalOpen && (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setIsNewChatModalOpen(false);
-            }}
-          >
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg m-4 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="text-xl font-bold text-slate-900">New Chat</h3>
-                <button
-                  onClick={() => setIsNewChatModalOpen(false)}
-                  className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-5">
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setNewChatKind('direct')}
-                    className={`px-4 py-3 rounded-xl border text-sm font-bold transition-colors ${
-                      newChatKind === 'direct' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    Direct
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewChatKind('group')}
-                    className={`px-4 py-3 rounded-xl border text-sm font-bold transition-colors ${
-                      newChatKind === 'group' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    Group
-                  </button>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    {newChatKind === 'group' ? 'Group name' : 'Person name'}
-                  </label>
-                  <input
-                    value={newChatName}
-                    onChange={(e) => setNewChatName(e.target.value)}
-                    placeholder={newChatKind === 'group' ? 'e.g., Morning Circle' : 'e.g., Rahul'}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none"
-                  />
-                </div>
-
-                {newChatKind === 'group' && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Members</label>
-                    <input
-                      type="number"
-                      min={2}
-                      value={newChatMembers}
-                      onChange={(e) => setNewChatMembers(Number(e.target.value))}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none"
-                    />
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsNewChatModalOpen(false)}
-                    className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCreateChat}
-                    disabled={isCreatingChat}
-                    className={`px-5 py-2.5 rounded-xl font-bold transition-colors ${
-                      isCreatingChat ? 'bg-slate-200 text-slate-500' : 'bg-teal-600 text-white hover:bg-teal-700'
-                    }`}
-                  >
-                    {isCreatingChat ? 'Creating...' : 'Create'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

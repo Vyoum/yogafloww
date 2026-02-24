@@ -107,7 +107,8 @@ service cloud.firestore {
     }
 
     match /community_conversations/{conversationId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
 
       match /messages/{messageId} {
         allow read, write: if true;
