@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './Button';
 import { db } from '../config/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 import {
     User,
     Calendar,
@@ -80,6 +80,36 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab
 
         return () => unsubscribe();
     }, [activeTab, user?.id]);
+
+    useEffect(() => {
+        if (activeTab !== 'subscription') return;
+        const subId = subscription?.razorpaySubscriptionId;
+        if (!user?.id || !subId || typeof subId !== 'string') return;
+
+        fetch(`/api/razorpay/fetch-subscription?subscriptionId=${encodeURIComponent(subId)}`)
+            .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+            .then(async ({ ok, j }) => {
+                if (!ok) return;
+                const sub = j?.subscription;
+                if (!sub) return;
+
+                const currentEnd = typeof sub.current_end === 'number' ? sub.current_end : null;
+                const status = typeof sub.status === 'string' ? sub.status : null;
+                const planId = typeof sub.plan_id === 'string' ? sub.plan_id : null;
+
+                await setDoc(
+                    doc(db, 'subscription', user.id),
+                    {
+                        status: status || undefined,
+                        razorpayPlanId: planId || undefined,
+                        currentPeriodEnd: currentEnd ? Timestamp.fromDate(new Date(currentEnd * 1000)) : undefined,
+                        updatedAt: serverTimestamp(),
+                    },
+                    { merge: true }
+                );
+            })
+            .catch(() => {});
+    }, [activeTab, subscription?.razorpaySubscriptionId, user?.id]);
 
     const handleLogout = () => {
         logout();

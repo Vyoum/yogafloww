@@ -1,5 +1,7 @@
 // Razorpay Payment Integration
-const RAZORPAY_KEY_ID = 'rzp_live_RUVJ48Tx6iUsSt';
+const RAZORPAY_KEY_ID =
+  (import.meta as any)?.env?.VITE_RAZORPAY_KEY_ID ||
+  'rzp_live_RUVJ48Tx6iUsSt';
 
 // Declare Razorpay types
 declare global {
@@ -10,8 +12,9 @@ declare global {
 
 interface RazorpayOptions {
   key: string;
-  amount: number; // Amount in paise (smallest currency unit)
-  currency: string;
+  amount?: number; // Amount in paise (smallest currency unit)
+  currency?: string;
+  subscription_id?: string;
   name: string;
   description: string;
   handler: (response: any) => void;
@@ -51,6 +54,34 @@ export const initiateRazorpayPayment = (
     document.body.appendChild(script);
   } else {
     openRazorpayCheckout(amount, planName, planFrequency, onSuccess, onError);
+  }
+};
+
+export const initiateRazorpaySubscription = (
+  subscriptionId: string,
+  planName: string,
+  planFrequency: string,
+  onSuccess?: (response: any) => void,
+  onError?: (error: any) => void
+) => {
+  if (!subscriptionId) {
+    if (onError) onError(new Error('Missing subscription id'));
+    return;
+  }
+
+  if (!window.Razorpay) {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => {
+      openRazorpaySubscriptionCheckout(subscriptionId, planName, planFrequency, onSuccess, onError);
+    };
+    script.onerror = () => {
+      if (onError) onError(new Error('Failed to load Razorpay checkout script'));
+    };
+    document.body.appendChild(script);
+  } else {
+    openRazorpaySubscriptionCheckout(subscriptionId, planName, planFrequency, onSuccess, onError);
   }
 };
 
@@ -105,5 +136,39 @@ const openRazorpayCheckout = (
     if (onError) {
       onError(error);
     }
+  }
+};
+
+const openRazorpaySubscriptionCheckout = (
+  subscriptionId: string,
+  planName: string,
+  planFrequency: string,
+  onSuccess?: (response: any) => void,
+  onError?: (error: any) => void
+) => {
+  const options: RazorpayOptions = {
+    key: RAZORPAY_KEY_ID,
+    subscription_id: subscriptionId,
+    name: 'Yoga Flow',
+    description: `${planName} - ${planFrequency}`,
+    handler: function (response: any) {
+      if (onSuccess) onSuccess(response);
+    },
+    theme: {
+      color: '#0d9488',
+    },
+    modal: {
+      ondismiss: function () {
+        if (onError) onError(new Error('Payment cancelled by user'));
+      },
+    },
+  };
+
+  try {
+    const razorpay = new window.Razorpay(options);
+    razorpay.open();
+  } catch (error) {
+    console.error('Error opening Razorpay checkout:', error);
+    if (onError) onError(error);
   }
 };

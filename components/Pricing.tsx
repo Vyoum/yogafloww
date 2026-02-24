@@ -6,7 +6,7 @@ import { PricingTier } from '../types';
 import { Button } from './Button';
 import { Check, ShieldCheck, Zap, Star, Globe } from 'lucide-react';
 import { Reveal } from './Reveal';
-import { initiateRazorpayPayment } from '../utils/razorpay';
+import { initiateRazorpayPayment, initiateRazorpaySubscription } from '../utils/razorpay';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginModal, SignupModal } from './LoginModal';
 import { db } from '../config/firebase';
@@ -43,16 +43,20 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
     return end;
   };
 
-  const saveSubscription = async (tier: PricingTier, paymentResponse: any) => {
+  const saveSubscription = async (tier: PricingTier, paymentResponse: any, razorpay?: { subscriptionId?: string; planId?: string; currentEnd?: number; status?: string; }) => {
     if (!user?.id) return;
-    const currentPeriodEnd = getCurrentPeriodEnd(tier);
+    const currentPeriodEnd = razorpay?.currentEnd
+      ? new Date(Number(razorpay.currentEnd) * 1000)
+      : getCurrentPeriodEnd(tier);
     const subscriptionRef = doc(db, 'subscription', user.id);
     await setDoc(subscriptionRef, {
       id: user.id,
       planType: tier.name,
-      status: 'active',
+      status: razorpay?.status || 'active',
       currentPeriodEnd: Timestamp.fromDate(currentPeriodEnd),
       paymentId: paymentResponse?.razorpay_payment_id ?? null,
+      razorpaySubscriptionId: razorpay?.subscriptionId ?? paymentResponse?.razorpay_subscription_id ?? null,
+      razorpayPlanId: razorpay?.planId ?? null,
       planFrequency: tier.frequency ?? null,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -61,7 +65,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
     const userRef = doc(db, 'users', user.id);
     await setDoc(userRef, {
       plan: tier.name,
-      planStatus: 'active',
+      planStatus: razorpay?.status || 'active',
       planCurrentPeriodEnd: Timestamp.fromDate(currentPeriodEnd),
       planUpdatedAt: serverTimestamp(),
     }, { merge: true });
@@ -73,6 +77,85 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
       console.error('Error saving subscription:', error);
     });
     alert(`Payment successful! Welcome to ${tier.name}. Your payment ID: ${response.razorpay_payment_id}`);
+  };
+
+  const MONTHLY_PLAN_ID = 'plan_SK5sCuQ0VyqnGn';
+  const isMonthlyTier = (tier: PricingTier) => {
+    const frequency = (tier.frequency || '').toLowerCase();
+    return frequency.includes('month') || frequency === '/month';
+  };
+
+  const startAutopaySubscription = async (tier: PricingTier) => {
+    if (!user?.id) {
+      alert('Please login to continue.');
+      return;
+    }
+
+    try {
+      const resp = await fetch('/api/razorpay/create-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: MONTHLY_PLAN_ID,
+          userId: user.id,
+          email: user.email || '',
+          name: user.name || '',
+          totalCount: 120,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data?.error || 'Failed to create subscription');
+      }
+
+      initiateRazorpaySubscription(
+        data.subscriptionId,
+        tier.name,
+        tier.frequency,
+        async (response) => {
+          try {
+            const verifyResp = await fetch('/api/razorpay/verify-subscription', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(response),
+            });
+            const verified = await verifyResp.json();
+            if (!verifyResp.ok || !verified?.ok) {
+              throw new Error(verified?.error || 'Subscription verification failed');
+            }
+
+            const sub = verified.subscription as any;
+            await saveSubscription(
+              tier,
+              response,
+              {
+                subscriptionId: sub?.id,
+                planId: sub?.plan_id,
+                currentEnd: sub?.current_end,
+                status: sub?.status,
+              }
+            );
+
+            alert(`Subscription activated! Payment ID: ${response.razorpay_payment_id}`);
+          } catch (err: any) {
+            console.error('Subscription verification error:', err);
+            alert(err?.message || 'Subscription verification failed. Please contact support.');
+          } finally {
+            setPendingPurchase(null);
+          }
+        },
+        (error) => {
+          console.error('Subscription payment error:', error);
+          if (error?.message !== 'Payment cancelled by user') {
+            alert('Subscription setup failed. Please try again or contact support.');
+          }
+          setPendingPurchase(null);
+        }
+      );
+    } catch (error: any) {
+      console.error('Autopay start failed:', error);
+      alert(error?.message || 'Failed to start subscription.');
+    }
   };
 
   // Detect user location on component mount
@@ -147,25 +230,26 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
             alert('International payments coming soon! For now, please contact support at support@yogaflow.com to complete your purchase.');
             setPendingPurchase(null);
           } else {
-            // INR payments via Razorpay
-            initiateRazorpayPayment(
-              amount,
-              tier.name,
-              tier.frequency,
-              (response) => {
-                handlePaymentSuccess(tier, response);
-                setPendingPurchase(null);
-                // Here you would typically redirect to a success page or update user status
-              },
-              (error) => {
-                // Payment failed or cancelled
-                console.error('Payment error:', error);
-                setPendingPurchase(null);
-                if (error.message !== 'Payment cancelled by user') {
-                  alert('Payment failed. Please try again or contact support.');
+            if (isMonthlyTier(tier)) {
+              startAutopaySubscription(tier);
+            } else {
+              initiateRazorpayPayment(
+                amount,
+                tier.name,
+                tier.frequency,
+                (response) => {
+                  handlePaymentSuccess(tier, response);
+                  setPendingPurchase(null);
+                },
+                (error) => {
+                  console.error('Payment error:', error);
+                  setPendingPurchase(null);
+                  if (error.message !== 'Payment cancelled by user') {
+                    alert('Payment failed. Please try again or contact support.');
+                  }
                 }
-              }
-            );
+              );
+            }
           }
         }, 300);
       }
@@ -201,16 +285,19 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
     }
 
     // INR payments via Razorpay
+    if (isMonthlyTier(tier)) {
+      startAutopaySubscription(tier);
+      return;
+    }
+
     initiateRazorpayPayment(
       amount,
       tier.name,
       tier.frequency,
       (response) => {
         handlePaymentSuccess(tier, response);
-        // Here you would typically redirect to a success page or update user status
       },
       (error) => {
-        // Payment failed or cancelled
         console.error('Payment error:', error);
         if (error.message !== 'Payment cancelled by user') {
           alert('Payment failed. Please try again or contact support.');
