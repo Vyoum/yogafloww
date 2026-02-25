@@ -7,7 +7,7 @@ import {
   Sparkles, Target, ChevronRight, X, ShieldCheck, Microscope, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { db, storage } from '../config/firebase';
+import { auth, db, storage } from '../config/firebase';
 import { collection, getDocs, query, orderBy, limit, doc, setDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { DEFAULT_COMMUNITY_SETTINGS, getSettings, updateSettings } from '../utils/settings';
@@ -112,6 +112,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     DEFAULT_COMMUNITY_SETTINGS.conversations[0]?.id || ''
   );
   const [isSavingCommunity, setIsSavingCommunity] = useState(false);
+  const [isCommunityGroupModalOpen, setIsCommunityGroupModalOpen] = useState(false);
+  const [communityGroupName, setCommunityGroupName] = useState('');
+  const [communityGroupMemberSearch, setCommunityGroupMemberSearch] = useState('');
+  const [communityGroupSelectedUserIds, setCommunityGroupSelectedUserIds] = useState<string[]>([]);
+  const [editingCommunityConversationId, setEditingCommunityConversationId] = useState<string | null>(null);
   const [journeySettings, setJourneySettings] = useState<JourneySettings | null>(null);
   const [isSavingJourney, setIsSavingJourney] = useState(false);
   const [isJourneyStepModalOpen, setIsJourneyStepModalOpen] = useState(false);
@@ -978,12 +983,141 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     ]);
   };
 
+  const resetCommunityGroupModal = () => {
+    setEditingCommunityConversationId(null);
+    setCommunityGroupName('');
+    setCommunityGroupMemberSearch('');
+    setCommunityGroupSelectedUserIds([]);
+  };
+
+  const openCreateCommunityGroup = () => {
+    if (!auth.currentUser) {
+      alert('Please sign in with Google/Firebase to manage community groups.');
+      setIsLoginModalOpen(true);
+      return;
+    }
+    resetCommunityGroupModal();
+    setIsCommunityGroupModalOpen(true);
+  };
+
+  const openEditCommunityGroup = (conversationId: string) => {
+    if (!auth.currentUser) {
+      alert('Please sign in with Google/Firebase to manage community groups.');
+      setIsLoginModalOpen(true);
+      return;
+    }
+    const conv = (communitySettings.conversations || []).find((c) => c.id === conversationId);
+    if (!conv) return;
+    setEditingCommunityConversationId(conversationId);
+    setCommunityGroupName(conv.author || '');
+    setCommunityGroupMemberSearch('');
+    setCommunityGroupSelectedUserIds(Array.isArray((conv as any).memberIds) ? ((conv as any).memberIds as string[]) : []);
+    setIsCommunityGroupModalOpen(true);
+  };
+
+  const saveCommunityGroupFromModal = async () => {
+    if (!auth.currentUser) {
+      alert('Please sign in with Google/Firebase to manage community groups.');
+      setIsLoginModalOpen(true);
+      return;
+    }
+    const name = communityGroupName.trim();
+    if (!name) {
+      alert('Please enter a group name.');
+      return;
+    }
+    if (communityGroupSelectedUserIds.length === 0) {
+      alert('Please select at least 1 user for the group.');
+      return;
+    }
+
+    const makeAvatar = (author: string) => {
+      const parts = (author || '').trim().split(/\s+/).filter(Boolean);
+      const letters = parts.map((p) => (p[0] || '').toUpperCase()).join('');
+      return (letters || 'CC').slice(0, 2);
+    };
+    const makeId = (author: string) => {
+      const base = author.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      if (!base) return `group-${Date.now()}`;
+      const exists = (communitySettings.conversations || []).some((c) => c.id === base);
+      return exists ? `${base}-${Date.now()}` : base;
+    };
+
+    const nextId = editingCommunityConversationId || makeId(name);
+    const avatar = makeAvatar(name);
+
+    const prevConversations = communitySettings.conversations || [];
+    const existingIndex = prevConversations.findIndex((c) => c.id === nextId);
+      const nextConversation: CommunityConversation = {
+        ...(existingIndex >= 0 ? prevConversations[existingIndex] : ({} as any)),
+        id: nextId,
+        author: name,
+        avatar,
+        lastText: (existingIndex >= 0 ? prevConversations[existingIndex].lastText : '') || '',
+        time: (existingIndex >= 0 ? prevConversations[existingIndex].time : '') || 'Just now',
+        unreadCount: 0,
+        isGroup: true,
+        isSupportGroup: false,
+        members: communityGroupSelectedUserIds.length,
+        memberIds: [...communityGroupSelectedUserIds],
+      };
+
+    const nextConversations =
+      existingIndex >= 0
+        ? prevConversations.map((c, idx) => (idx === existingIndex ? nextConversation : c))
+        : [...prevConversations, nextConversation];
+
+    const nextHistories = { ...(communitySettings.histories || {}) };
+    if (!nextHistories[nextId]) nextHistories[nextId] = [];
+
+    const nextCommunitySettings: CommunitySettings = {
+      ...communitySettings,
+      conversations: nextConversations,
+      histories: nextHistories,
+    };
+
+    setCommunitySettings(nextCommunitySettings);
+
+    void setDoc(
+      doc(db, 'community_conversations', nextId),
+      {
+        author: name,
+        avatar,
+        isGroup: true,
+        isSupportGroup: false,
+        members: communityGroupSelectedUserIds.length,
+        memberIds: [...communityGroupSelectedUserIds],
+        lastText: '',
+        time: 'Just now',
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      },
+      { merge: true }
+    ).catch(() => {});
+
+    try {
+      await updateSettings({ community: sanitizeForFirestore(nextCommunitySettings) });
+    } catch (error: any) {
+      console.error('❌ Error saving community group:', error);
+      alert(`Failed to save group: ${error?.message || 'Please try again.'}`);
+    }
+
+    setActiveCommunityConversationId(nextId);
+    setIsCommunityGroupModalOpen(false);
+    resetCommunityGroupModal();
+  };
+
   const removeCommunityMessage = (index: number) => {
     setActiveCommunityMessages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveCommunity = async () => {
     try {
+      if (!auth.currentUser) {
+        alert('Please sign in with Google/Firebase to manage community groups.');
+        setIsLoginModalOpen(true);
+        return;
+      }
       setIsSavingCommunity(true);
 
       const cleanText = (v: any) => (typeof v === 'string' ? v.trim() : '');
@@ -1005,11 +1139,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           const lastText = cleanText(c.lastText);
           const time = cleanText(c.time);
           const unreadCount = typeof c.unreadCount === 'number' ? c.unreadCount : 0;
-          const members = typeof c.members === 'number' ? c.members : 0;
+          const memberIds =
+            Array.isArray((c as any).memberIds)
+              ? (c as any).memberIds.map((v: any) => cleanText(v)).filter((v: string) => v.length > 0)
+              : [];
+          const members = memberIds.length > 0 ? memberIds.length : (typeof c.members === 'number' ? c.members : 0);
           const isGroup = !!c.isGroup;
           const isSupportGroup = !!c.isSupportGroup;
           if (author === '' && lastText === '' && time === '') return null;
-          return { ...c, id, author, avatar, lastText, time, unreadCount, members, isGroup, isSupportGroup } as CommunityConversation;
+          return { ...c, id, author, avatar, lastText, time, unreadCount, members, memberIds, isGroup, isSupportGroup } as CommunityConversation;
         })
         .filter((c): c is CommunityConversation => !!c);
 
@@ -1044,6 +1182,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       };
 
       await updateSettings({ community: sanitizeForFirestore(cleaned) });
+      await Promise.all(
+        cleaned.conversations.map((c) =>
+          setDoc(
+            doc(db, 'community_conversations', c.id),
+            sanitizeForFirestore({
+              author: c.author,
+              avatar: c.avatar,
+              isGroup: !!c.isGroup,
+              isSupportGroup: !!c.isSupportGroup,
+              members: typeof c.members === 'number' ? c.members : 0,
+              memberIds: Array.isArray((c as any).memberIds) ? (c as any).memberIds : [],
+              updatedAt: serverTimestamp(),
+              createdAt: serverTimestamp(),
+            }),
+            { merge: true }
+          )
+        )
+      );
       setCommunitySettings(cleaned);
       setActiveCommunityConversationId((prev) => {
         const exists = cleaned.conversations.some((c) => c.id === prev);
@@ -2578,8 +2734,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
 
               {activeTab === 'community' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-slate-900 mb-6">Community Section Preview</h2>
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-900">Community Management</h2>
+                      <p className="text-sm text-slate-600">Create groups and assign members from your users list.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={openCreateCommunityGroup}
+                        className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-sm"
+                      >
+                        <Plus size={18} />
+                        <span>Add Group</span>
+                      </button>
+                      <button
+                        onClick={handleSaveCommunity}
+                        disabled={isSavingCommunity}
+                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <CheckCircle2 size={18} />
+                        <span>{isSavingCommunity ? 'Saving...' : 'Save Community'}</span>
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="divide-y divide-slate-200">
+                      {(communitySettings.conversations || []).filter((c) => c.isGroup).length === 0 ? (
+                        <div className="px-6 py-12 text-center text-slate-500">No groups found. Add your first group.</div>
+                      ) : (
+                        (communitySettings.conversations || [])
+                          .map((c, idx) => ({ c, idx }))
+                          .filter(({ c }) => c.isGroup)
+                          .map(({ c, idx }) => (
+                            <div key={c.id || idx} className="p-6 hover:bg-slate-50 transition-colors">
+                              <div className="flex items-start justify-between gap-6 flex-wrap">
+                                <div className="min-w-[240px]">
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-serif font-bold">
+                                      {(c.avatar || 'CG').slice(0, 2)}
+                                    </div>
+                                    <div>
+                                      <div className="font-bold text-slate-900">{c.author || 'Untitled group'}</div>
+                                      <div className="text-xs text-slate-500">{c.id || '(id pending)'}</div>
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-slate-600 mt-2">
+                                    Members:{' '}
+                                    {Array.isArray((c as any).memberIds) && (c as any).memberIds.length > 0
+                                      ? (c as any).memberIds.length
+                                      : (typeof c.members === 'number' ? c.members : 0)}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => openEditCommunityGroup(c.id)}
+                                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-sm"
+                                  >
+                                    <Edit size={16} />
+                                    <span>Edit Members</span>
+                                  </button>
+                                  <button
+                                    onClick={() => removeCommunityConversation(idx)}
+                                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2"
+                                  >
+                                    <Trash2 size={16} />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-4 border-b border-slate-200">
+                      <h3 className="font-bold text-slate-900">Community Preview</h3>
+                    </div>
                     <CommunityPage />
                   </div>
                 </div>
@@ -2996,6 +3229,159 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           setIsLoginModalOpen(true);
         }}
       />
+
+      {isCommunityGroupModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsCommunityGroupModalOpen(false);
+              resetCommunityGroupModal();
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl m-4 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">
+                  {editingCommunityConversationId ? 'Edit Group' : 'Create Group'}
+                </h3>
+                <p className="text-sm text-slate-600">Select members from your users list.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsCommunityGroupModalOpen(false);
+                  resetCommunityGroupModal();
+                }}
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Group name</label>
+                  <input
+                    value={communityGroupName}
+                    onChange={(e) => setCommunityGroupName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none"
+                    placeholder="e.g., Beginners Support"
+                  />
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-900">Selected members</span>
+                    <span className="text-xs font-bold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-1 rounded-full">
+                      {communityGroupSelectedUserIds.length}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-2 max-h-44 overflow-y-auto pr-2">
+                    {communityGroupSelectedUserIds.length === 0 ? (
+                      <div className="text-sm text-slate-500">No users selected.</div>
+                    ) : (
+                      communityGroupSelectedUserIds.map((id) => {
+                        const u = users.find((x) => x.id === id);
+                        return (
+                          <div key={id} className="flex items-center justify-between gap-3 text-sm">
+                            <div className="min-w-0">
+                              <div className="font-medium text-slate-900 truncate">{u?.name || id}</div>
+                              <div className="text-xs text-slate-500 truncate">{u?.email || ''}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCommunityGroupSelectedUserIds((prev) => prev.filter((x) => x !== id))
+                              }
+                              className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Search users</label>
+                  <input
+                    value={communityGroupMemberSearch}
+                    onChange={(e) => setCommunityGroupMemberSearch(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none"
+                    placeholder="Search by name or email"
+                  />
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+                    {users
+                      .filter((u) => {
+                        const q = communityGroupMemberSearch.trim().toLowerCase();
+                        if (!q) return true;
+                        return (
+                          (u.name || '').toLowerCase().includes(q) ||
+                          (u.email || '').toLowerCase().includes(q)
+                        );
+                      })
+                      .map((u) => {
+                        const checked = communityGroupSelectedUserIds.includes(u.id);
+                        return (
+                          <label
+                            key={u.id}
+                            className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const next = e.target.checked;
+                                setCommunityGroupSelectedUserIds((prev) =>
+                                  next ? Array.from(new Set([...prev, u.id])) : prev.filter((x) => x !== u.id)
+                                );
+                              }}
+                              className="h-4 w-4"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-slate-900 truncate">{u.name}</div>
+                              <div className="text-xs text-slate-500 truncate">{u.email}</div>
+                            </div>
+                            <div className="text-xs text-slate-500">{u.source}</div>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCommunityGroupModalOpen(false);
+                  resetCommunityGroupModal();
+                }}
+                className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveCommunityGroupFromModal}
+                className="px-5 py-2.5 rounded-xl bg-teal-600 text-white font-bold hover:bg-teal-700 transition-colors"
+              >
+                {editingCommunityConversationId ? 'Save' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

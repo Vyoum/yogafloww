@@ -108,7 +108,8 @@ service cloud.firestore {
 
     match /community_conversations/{conversationId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || request.resource.data.diff(resource.data).changedKeys().hasOnly(['lastText', 'time', 'updatedAt']);
 
       match /messages/{messageId} {
         allow read, write: if true;

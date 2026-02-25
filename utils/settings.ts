@@ -27,6 +27,7 @@ export interface CommunityConversation {
   unreadCount?: number;
   isGroup?: boolean;
   members?: number;
+  memberIds?: string[];
   isSupportGroup?: boolean;
 }
 

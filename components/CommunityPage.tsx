@@ -531,7 +531,9 @@ export const CommunityPage: React.FC = () => {
                     {selectedConversation.isSupportGroup 
                       ? 'Safe Space for Support & Growth' 
                       : selectedConversation.isGroup 
-                      ? `${selectedConversation.members} Members Online` 
+                      ? `${(Array.isArray((selectedConversation as any).memberIds) && (selectedConversation as any).memberIds.length > 0
+                          ? (selectedConversation as any).memberIds.length
+                          : selectedConversation.members) || 0} Members Online` 
                       : 'Available to chat'}
                   </p>
                   {selectedConversation.isSupportGroup && (
@@ -541,7 +543,11 @@ export const CommunityPage: React.FC = () => {
                   )}
                   {!selectedConversation.isSupportGroup && (
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-8">
-                      {selectedConversation.isGroup ? `${selectedConversation.members} Members Online` : 'Available to chat'}
+                      {selectedConversation.isGroup
+                        ? `${(Array.isArray((selectedConversation as any).memberIds) && (selectedConversation as any).memberIds.length > 0
+                            ? (selectedConversation as any).memberIds.length
+                            : selectedConversation.members) || 0} Members Online`
+                        : 'Available to chat'}
                     </p>
                   )}
 
