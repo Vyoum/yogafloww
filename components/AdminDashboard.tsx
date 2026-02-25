@@ -1186,7 +1186,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         cleaned.conversations.map((c) =>
           setDoc(
             doc(db, 'community_conversations', c.id),
-            sanitizeForFirestore({
+            {
               author: c.author,
               avatar: c.avatar,
               isGroup: !!c.isGroup,
@@ -1195,7 +1195,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
               memberIds: Array.isArray((c as any).memberIds) ? (c as any).memberIds : [],
               updatedAt: serverTimestamp(),
               createdAt: serverTimestamp(),
-            }),
+            },
             { merge: true }
           )
         )
