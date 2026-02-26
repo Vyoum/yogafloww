@@ -101,6 +101,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
           email: user.email || '',
           name: user.name || '',
           totalCount: 120,
+          trialDays: 30,
         }),
       });
       const data = await resp.json();
@@ -125,13 +126,19 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
             }
 
             const sub = verified.subscription as any;
+            const nowSeconds = Math.floor(Date.now() / 1000);
+            const fallbackTrialEnd = nowSeconds + 30 * 24 * 60 * 60;
+            const currentEndSeconds = typeof sub?.current_end === 'number' && sub.current_end > 0
+              ? sub.current_end
+              : (typeof sub?.start_at === 'number' && sub.start_at > nowSeconds ? sub.start_at : fallbackTrialEnd);
+
             await saveSubscription(
               tier,
               response,
               {
                 subscriptionId: sub?.id,
                 planId: sub?.plan_id,
-                currentEnd: sub?.current_end,
+                currentEnd: currentEndSeconds,
                 status: sub?.status,
               }
             );

@@ -36,6 +36,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
   const customerEmail = typeof body.email === 'string' ? body.email.trim() : '';
   const customerName = typeof body.name === 'string' ? body.name.trim() : '';
+  const trialDaysRaw = Number(body.trialDays);
+  const trialDays = Number.isFinite(trialDaysRaw) && trialDaysRaw > 0 ? Math.min(trialDaysRaw, 60) : 0; // cap at 60 days for safety
 
   if (!planId) {
     res.status(400).json({ error: 'Missing planId' });
@@ -46,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const totalCount = Number.isFinite(totalCountRaw) && totalCountRaw > 0 ? totalCountRaw : 120;
 
   try {
-    const subscription = await razorpay.subscriptions.create({
+    const payload: any = {
       plan_id: planId,
       customer_notify: 1,
       total_count: totalCount,
@@ -55,7 +57,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         email: customerEmail,
         name: customerName,
       },
-    });
+    };
+
+    // Implement free trial by setting a future start date
+    if (trialDays > 0) {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const startAt = nowSeconds + trialDays * 24 * 60 * 60;
+      payload.start_at = startAt;
+    }
+
+    const subscription = await razorpay.subscriptions.create(payload);
 
     res.status(200).json({
       subscriptionId: subscription.id,
