@@ -22,10 +22,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET ?? process.env.VITE_RAZORPAY_KEY_SECRET;
+  const keyId = process.env.RAZORPAY_KEY_ID ?? process.env.VITE_RAZORPAY_KEY_ID;
   if (!keySecret || !keyId) {
-    res.status(500).json({ error: 'Missing Razorpay server configuration' });
+    res.status(500).json({ error: 'Missing Razorpay server configuration (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)' });
     return;
   }
 
@@ -59,4 +59,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(500).json({ error: error?.message || 'Verification succeeded but fetch failed' });
   }
 }
-
