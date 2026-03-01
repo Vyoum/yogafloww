@@ -1,7 +1,5 @@
 // Razorpay Payment Integration
-const RAZORPAY_KEY_ID =
-  (import.meta as any)?.env?.VITE_RAZORPAY_KEY_ID ||
-  'rzp_live_RUVJ48Tx6iUsSt';
+const RAZORPAY_KEY_ID = (import.meta as any)?.env?.VITE_RAZORPAY_KEY_ID || '';
 
 // Declare Razorpay types
 declare global {
@@ -38,6 +36,10 @@ export const initiateRazorpayPayment = (
   onSuccess?: (response: any) => void,
   onError?: (error: any) => void
 ) => {
+  if (!RAZORPAY_KEY_ID) {
+    if (onError) onError(new Error('Missing Razorpay client configuration (set VITE_RAZORPAY_KEY_ID)'));
+    return;
+  }
   // Load Razorpay script if not already loaded
   if (!window.Razorpay) {
     const script = document.createElement('script');
@@ -64,6 +66,10 @@ export const initiateRazorpaySubscription = (
   onSuccess?: (response: any) => void,
   onError?: (error: any) => void
 ) => {
+  if (!RAZORPAY_KEY_ID) {
+    if (onError) onError(new Error('Missing Razorpay client configuration (set VITE_RAZORPAY_KEY_ID)'));
+    return;
+  }
   if (!subscriptionId) {
     if (onError) onError(new Error('Missing subscription id'));
     return;
