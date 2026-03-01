@@ -32,6 +32,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab
     const [subscription, setSubscription] = useState<any | null>(null);
     const [subscriptionLoading, setSubscriptionLoading] = useState(false);
     const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+    const [isCancellingSubscription, setIsCancellingSubscription] = useState(false);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'N/A';
@@ -114,6 +115,65 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab
     const handleLogout = () => {
         logout();
         onBack();
+    };
+
+    const readJson = async (resp: Response) => {
+        const text = await resp.text();
+        if (!text) return {};
+        try {
+            return JSON.parse(text);
+        } catch {
+            return { __raw: text };
+        }
+    };
+
+    const cancelSubscription = async () => {
+        const subId = subscription?.razorpaySubscriptionId;
+        if (!user?.id || !subId || typeof subId !== 'string') return;
+        if (isCancellingSubscription) return;
+        const ok = window.confirm('Cancel your subscription at the end of the current billing period?');
+        if (!ok) return;
+
+        setIsCancellingSubscription(true);
+        try {
+            const resp = await fetch('/api/razorpay/cancel-subscription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscriptionId: subId, cancelAtCycleEnd: true }),
+            });
+            const data: any = await readJson(resp);
+            if (!resp.ok || !data?.ok) {
+                throw new Error(data?.error || 'Failed to cancel subscription');
+            }
+            const sub = data?.subscription;
+            const status = typeof sub?.status === 'string' ? sub.status : 'cancelled';
+            const currentEnd = typeof sub?.current_end === 'number' ? sub.current_end : null;
+
+            await setDoc(
+                doc(db, 'subscription', user.id),
+                {
+                    status,
+                    cancelAtCycleEnd: true,
+                    cancelRequestedAt: serverTimestamp(),
+                    currentPeriodEnd: currentEnd ? Timestamp.fromDate(new Date(currentEnd * 1000)) : undefined,
+                    updatedAt: serverTimestamp(),
+                },
+                { merge: true }
+            );
+
+            await setDoc(
+                doc(db, 'users', user.id),
+                {
+                    planStatus: status,
+                    planUpdatedAt: serverTimestamp(),
+                },
+                { merge: true }
+            );
+        } catch (e: any) {
+            alert(e?.message || 'Failed to cancel subscription.');
+        } finally {
+            setIsCancellingSubscription(false);
+        }
     };
 
     const tabs: { id: TabType; label: string; icon: React.FC<any> }[] = [
@@ -440,6 +500,27 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab
                                                             <span className="font-medium text-slate-900 truncate max-w-[220px]">{(subscription.paymentId || 'N/A').toString()}</span>
                                                         </div>
                                                     </div>
+                                                    {(() => {
+                                                        const status = (subscription.status || '').toString().toLowerCase();
+                                                        const showCancel = Boolean(subscription.razorpaySubscriptionId) && !status.includes('cancel') && !status.includes('expire') && !status.includes('complete');
+                                                        if (!showCancel) return null;
+                                                        return (
+                                                            <div className="mt-6">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="rounded-full w-full"
+                                                                    disabled={isCancellingSubscription}
+                                                                    onClick={cancelSubscription}
+                                                                >
+                                                                    {isCancellingSubscription ? 'Cancelling...' : 'Cancel Subscription'}
+                                                                </Button>
+                                                                <p className="text-xs text-slate-500 mt-2">
+                                                                    Cancellation takes effect at the end of your current billing period.
+                                                                </p>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
 
                                                 <div className="p-6 border border-slate-100 rounded-2xl">
