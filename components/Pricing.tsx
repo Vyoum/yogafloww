@@ -26,6 +26,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
   const [pricingTiersINR, setPricingTiersINR] = useState<PricingTier[]>(PRICING_TIERS_INR);
   const [pricingTiersUSD, setPricingTiersUSD] = useState<PricingTier[]>(PRICING_TIERS_USD);
   const [razorpayKeyId, setRazorpayKeyId] = useState<string>('');
+  const [userSubscription, setUserSubscription] = useState<any | null>(null);
 
   const readJson = async (resp: Response) => {
     const text = await resp.text();
@@ -67,6 +68,25 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setUserSubscription(null);
+      return;
+    }
+
+    const ref = doc(db, 'subscription', user.id);
+    const unsubscribe = onSnapshot(
+      ref,
+      (snap) => {
+        setUserSubscription(snap.exists() ? snap.data() : null);
+      },
+      () => {
+        setUserSubscription(null);
+      }
+    );
+    return unsubscribe;
+  }, [isAuthenticated, user?.id]);
 
   const getCurrentPeriodEnd = (tier: PricingTier): Date => {
     const now = new Date();
@@ -126,6 +146,19 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
     const frequency = (tier.frequency || '').toLowerCase();
     return frequency.includes('month') || frequency === '/month';
   };
+
+  const normalize = (value: any) => (value ?? '').toString().toLowerCase();
+  const isSubscriptionActive = (() => {
+    if (!userSubscription) return false;
+    const status = normalize(userSubscription?.status);
+    if (!status) return true;
+    if (status.includes('cancel')) return false;
+    if (status.includes('expire')) return false;
+    return true;
+  })();
+  const currentPlan = normalize(userSubscription?.planType || user?.plan);
+  const hasMonthly = isSubscriptionActive && currentPlan.includes('monthly');
+  const hasFullCourse = isSubscriptionActive && currentPlan.includes('full course');
 
   const startAutopaySubscription = async (tier: PricingTier) => {
     if (!user?.id) {
@@ -348,6 +381,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
 
     // INR payments via Razorpay
     if (isMonthlyTier(tier)) {
+      if (hasMonthly || hasFullCourse) return;
       startAutopaySubscription(tier);
       return;
     }
@@ -417,6 +451,15 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
         <div className="grid lg:grid-cols-2 gap-10 md:gap-16 items-start mt-16 max-w-5xl mx-auto">
           {currentPricingTiers.map((tier, idx) => (
             <Reveal key={idx} delay={idx * 0.1}>
+              {(() => {
+                const isMonthly = isMonthlyTier(tier);
+                const isFull = normalize(tier.name).includes('full course');
+                const disabled = (isMonthly && (hasMonthly || hasFullCourse)) || (isFull && hasFullCourse);
+                const buttonText = isFull
+                  ? (hasFullCourse ? 'Enrolled' : hasMonthly ? 'Upgrade Now' : tier.buttonText)
+                  : (hasMonthly ? 'Current Plan' : hasFullCourse ? 'Included' : tier.buttonText);
+
+                return (
               <div 
                 className={`relative rounded-[3rem] p-10 md:p-14 transition-all duration-700 h-full flex flex-col ${
                   tier.isRecommended 
@@ -470,10 +513,14 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
                     tier.isRecommended 
                     ? 'bg-teal-500 hover:bg-teal-400 border-none shadow-[0_20px_40px_-10px_rgba(20,184,166,0.3)] hover:scale-[1.02]' 
                     : 'hover:bg-teal-600 hover:text-white'
-                  }`}
-                  onClick={() => handlePurchase(tier)}
+                  } disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-transparent`}
+                  disabled={disabled}
+                  onClick={() => {
+                    if (disabled) return;
+                    handlePurchase(tier);
+                  }}
                 >
-                  {tier.buttonText}
+                  {buttonText}
                 </Button>
 
                 {tier.isRecommended && (
@@ -482,6 +529,8 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
                   </div>
                 )}
               </div>
+                );
+              })()}
             </Reveal>
           ))}
         </div>

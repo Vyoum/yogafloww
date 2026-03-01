@@ -449,6 +449,32 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab
                                                     </p>
                                                 </div>
                                             </div>
+
+                                            {(() => {
+                                                const plan = (subscription.planType || user?.plan || '').toString().toLowerCase();
+                                                if (!plan.includes('monthly') || plan.includes('full course')) return null;
+                                                return (
+                                                    <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                                        <div>
+                                                            <p className="font-bold text-slate-900">Upgrade to Full Course</p>
+                                                            <p className="text-sm text-slate-500">Get the complete 6-month program with a one-time payment.</p>
+                                                        </div>
+                                                        <Button
+                                                            variant="primary"
+                                                            className="rounded-full"
+                                                            onClick={() => {
+                                                                onBack();
+                                                                setTimeout(() => {
+                                                                    const el = document.getElementById('pricing');
+                                                                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                                                }, 150);
+                                                            }}
+                                                        >
+                                                            Upgrade Now
+                                                        </Button>
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     ) : (
                                         <div className="p-10 bg-slate-50 rounded-3xl border border-slate-100 text-slate-700">
