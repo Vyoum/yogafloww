@@ -25,6 +25,48 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
   const [showCurrencyToggle, setShowCurrencyToggle] = useState<boolean>(false);
   const [pricingTiersINR, setPricingTiersINR] = useState<PricingTier[]>(PRICING_TIERS_INR);
   const [pricingTiersUSD, setPricingTiersUSD] = useState<PricingTier[]>(PRICING_TIERS_USD);
+  const [razorpayKeyId, setRazorpayKeyId] = useState<string>('');
+
+  const readJson = async (resp: Response) => {
+    const text = await resp.text();
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { __raw: text };
+    }
+  };
+
+  const ensureRazorpayKeyId = async (): Promise<string> => {
+    if (razorpayKeyId) return razorpayKeyId;
+    try {
+      const r = await fetch('/api/razorpay/key-id');
+      const j: any = await readJson(r);
+      const key = typeof j?.keyId === 'string' ? j.keyId.trim() : '';
+      if (r.ok && key) {
+        setRazorpayKeyId(key);
+        return key;
+      }
+    } catch {}
+    return '';
+  };
+
+  useEffect(() => {
+    const envKeyId = (import.meta as any)?.env?.VITE_RAZORPAY_KEY_ID || '';
+    if (envKeyId) {
+      setRazorpayKeyId(envKeyId);
+      return;
+    }
+    fetch('/api/razorpay/key-id')
+      .then(async (r) => ({ ok: r.ok, j: await readJson(r) }))
+      .then(({ ok, j }) => {
+        if (!ok) return;
+        if (typeof j?.keyId === 'string' && j.keyId.trim()) {
+          setRazorpayKeyId(j.keyId.trim());
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const getCurrentPeriodEnd = (tier: PricingTier): Date => {
     const now = new Date();
@@ -104,9 +146,17 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
           trialDays: 30,
         }),
       });
-      const data = await resp.json();
+      const data: any = await readJson(resp);
       if (!resp.ok) {
-        throw new Error(data?.error || 'Failed to create subscription');
+        throw new Error(data?.error || `Failed to create subscription (${resp.status})`);
+      }
+      if (!data?.subscriptionId || typeof data.subscriptionId !== 'string') {
+        throw new Error(`Failed to create subscription (${resp.status})`);
+      }
+      const checkoutKeyId =
+        (typeof data?.keyId === 'string' && data.keyId.trim()) ? data.keyId.trim() : await ensureRazorpayKeyId();
+      if (!checkoutKeyId) {
+        throw new Error('Missing Razorpay client configuration (set VITE_RAZORPAY_KEY_ID)');
       }
 
       initiateRazorpaySubscription(
@@ -120,7 +170,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(response),
             });
-            const verified = await verifyResp.json();
+            const verified: any = await readJson(verifyResp);
             if (!verifyResp.ok || !verified?.ok) {
               throw new Error(verified?.error || 'Subscription verification failed');
             }
@@ -154,10 +204,11 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
         (error) => {
           console.error('Subscription payment error:', error);
           if (error?.message !== 'Payment cancelled by user') {
-            alert('Subscription setup failed. Please try again or contact support.');
+            alert(error?.message || 'Subscription setup failed. Please try again or contact support.');
           }
           setPendingPurchase(null);
-        }
+        },
+        checkoutKeyId
       );
     } catch (error: any) {
       console.error('Autopay start failed:', error);
@@ -231,39 +282,43 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
       if (amount > 0) {
         // Small delay to ensure modal is closed
         setTimeout(() => {
-          if (isUSD) {
-            // For USD payments, show a message (Razorpay is INR only)
-            // In production, you'd integrate with Stripe or another international payment gateway
-            alert('International payments coming soon! For now, please contact support at support@yogaflow.com to complete your purchase.');
-            setPendingPurchase(null);
-          } else {
-            if (isMonthlyTier(tier)) {
-              startAutopaySubscription(tier);
-            } else {
-              initiateRazorpayPayment(
-                amount,
-                tier.name,
-                tier.frequency,
-                (response) => {
-                  handlePaymentSuccess(tier, response);
-                  setPendingPurchase(null);
-                },
-                (error) => {
-                  console.error('Payment error:', error);
-                  setPendingPurchase(null);
-                  if (error.message !== 'Payment cancelled by user') {
-                    alert('Payment failed. Please try again or contact support.');
-                  }
-                }
-              );
+          (async () => {
+            if (isUSD) {
+              alert('International payments coming soon! For now, please contact support at support@yogaflow.com to complete your purchase.');
+              setPendingPurchase(null);
+              return;
             }
-          }
+
+            if (isMonthlyTier(tier)) {
+              await startAutopaySubscription(tier);
+              return;
+            }
+
+            const keyId = await ensureRazorpayKeyId();
+            initiateRazorpayPayment(
+              amount,
+              tier.name,
+              tier.frequency,
+              (response) => {
+                handlePaymentSuccess(tier, response);
+                setPendingPurchase(null);
+              },
+              (error) => {
+                console.error('Payment error:', error);
+                setPendingPurchase(null);
+                if (error.message !== 'Payment cancelled by user') {
+                  alert(error?.message || 'Payment failed. Please try again or contact support.');
+                }
+              },
+              keyId || undefined
+            );
+          })().catch(() => {});
         }, 300);
       }
     }
   }, [isAuthenticated, pendingPurchase]);
 
-  const handlePurchase = (tier: PricingTier) => {
+  const handlePurchase = async (tier: PricingTier) => {
     // Check if user is logged in
     if (!isAuthenticated) {
       // Store the purchase intent and show login modal
@@ -297,6 +352,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
       return;
     }
 
+    const keyId = await ensureRazorpayKeyId();
     initiateRazorpayPayment(
       amount,
       tier.name,
@@ -307,9 +363,10 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
       (error) => {
         console.error('Payment error:', error);
         if (error.message !== 'Payment cancelled by user') {
-          alert('Payment failed. Please try again or contact support.');
+          alert(error?.message || 'Payment failed. Please try again or contact support.');
         }
-      }
+      },
+      keyId || undefined
     );
   };
 

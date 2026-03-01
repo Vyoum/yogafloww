@@ -27,10 +27,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const RazorpayModule: any = await import('razorpay');
-  const Razorpay = RazorpayModule.default ?? RazorpayModule;
-  const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
-
   const body = await readJsonBody(req);
   const planId = typeof body.planId === 'string' ? body.planId.trim() : '';
   const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
@@ -48,6 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const totalCount = Number.isFinite(totalCountRaw) && totalCountRaw > 0 ? totalCountRaw : 120;
 
   try {
+    const RazorpayModule: any = await import('razorpay');
+    const Razorpay = RazorpayModule.default ?? RazorpayModule;
+    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+
     const payload: any = {
       plan_id: planId,
       customer_notify: 1,

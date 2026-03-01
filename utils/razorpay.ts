@@ -34,9 +34,11 @@ export const initiateRazorpayPayment = (
   planName: string,
   planFrequency: string,
   onSuccess?: (response: any) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
+  keyIdOverride?: string
 ) => {
-  if (!RAZORPAY_KEY_ID) {
+  const keyId = keyIdOverride || RAZORPAY_KEY_ID;
+  if (!keyId) {
     if (onError) onError(new Error('Missing Razorpay client configuration (set VITE_RAZORPAY_KEY_ID)'));
     return;
   }
@@ -46,7 +48,7 @@ export const initiateRazorpayPayment = (
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
     script.onload = () => {
-      openRazorpayCheckout(amount, planName, planFrequency, onSuccess, onError);
+      openRazorpayCheckout(amount, planName, planFrequency, keyId, onSuccess, onError);
     };
     script.onerror = () => {
       if (onError) {
@@ -55,7 +57,7 @@ export const initiateRazorpayPayment = (
     };
     document.body.appendChild(script);
   } else {
-    openRazorpayCheckout(amount, planName, planFrequency, onSuccess, onError);
+    openRazorpayCheckout(amount, planName, planFrequency, keyId, onSuccess, onError);
   }
 };
 
@@ -64,9 +66,11 @@ export const initiateRazorpaySubscription = (
   planName: string,
   planFrequency: string,
   onSuccess?: (response: any) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
+  keyIdOverride?: string
 ) => {
-  if (!RAZORPAY_KEY_ID) {
+  const keyId = keyIdOverride || RAZORPAY_KEY_ID;
+  if (!keyId) {
     if (onError) onError(new Error('Missing Razorpay client configuration (set VITE_RAZORPAY_KEY_ID)'));
     return;
   }
@@ -80,14 +84,14 @@ export const initiateRazorpaySubscription = (
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
     script.onload = () => {
-      openRazorpaySubscriptionCheckout(subscriptionId, planName, planFrequency, onSuccess, onError);
+      openRazorpaySubscriptionCheckout(subscriptionId, planName, planFrequency, keyId, onSuccess, onError);
     };
     script.onerror = () => {
       if (onError) onError(new Error('Failed to load Razorpay checkout script'));
     };
     document.body.appendChild(script);
   } else {
-    openRazorpaySubscriptionCheckout(subscriptionId, planName, planFrequency, onSuccess, onError);
+    openRazorpaySubscriptionCheckout(subscriptionId, planName, planFrequency, keyId, onSuccess, onError);
   }
 };
 
@@ -95,6 +99,7 @@ const openRazorpayCheckout = (
   amount: number | string,
   planName: string,
   planFrequency: string,
+  keyId: string,
   onSuccess?: (response: any) => void,
   onError?: (error: any) => void
 ) => {
@@ -104,7 +109,7 @@ const openRazorpayCheckout = (
   const amountInPaise = Math.round(cleanAmount * 100);
 
   const options: RazorpayOptions = {
-    key: RAZORPAY_KEY_ID,
+    key: keyId,
     amount: amountInPaise,
     currency: 'INR',
     name: 'Yoga Flow',
@@ -149,11 +154,12 @@ const openRazorpaySubscriptionCheckout = (
   subscriptionId: string,
   planName: string,
   planFrequency: string,
+  keyId: string,
   onSuccess?: (response: any) => void,
   onError?: (error: any) => void
 ) => {
   const options: RazorpayOptions = {
-    key: RAZORPAY_KEY_ID,
+    key: keyId,
     subscription_id: subscriptionId,
     name: 'Yoga Flow',
     description: `${planName} - ${planFrequency}`,
