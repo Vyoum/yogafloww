@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const totalCountRaw = Number(body.totalCount);
-  const totalCount = Number.isFinite(totalCountRaw) && totalCountRaw > 0 ? totalCountRaw : 120;
+  const totalCount = Number.isFinite(totalCountRaw) && totalCountRaw > 0 ? totalCountRaw : 24;
 
   try {
     const RazorpayModule: any = await import('razorpay');

@@ -142,7 +142,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
           userId: user.id,
           email: user.email || '',
           name: user.name || '',
-          totalCount: 120,
+          totalCount: 24,
           trialDays: 30,
         }),
       });
