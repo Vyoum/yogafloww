@@ -3468,6 +3468,7 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
         howTo: [''],
         focusCue: '',
         imageUrl: '',
+        galleryUrls: [],
       };
     }
     
@@ -3482,6 +3483,7 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
       howTo: (asanaData.howTo && asanaData.howTo.length > 0) ? [...asanaData.howTo] : [''],
       focusCue: asanaData.focusCue || '',
       imageUrl: asanaData.imageUrl || '',
+      galleryUrls: (asanaData.galleryUrls && asanaData.galleryUrls.length > 0) ? [...asanaData.galleryUrls] : [],
     };
   };
 
@@ -3503,6 +3505,7 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
     // Filter out empty benefits and howTo
     const cleanBenefits = formData.benefits.filter(b => b.trim() !== '');
     const cleanHowTo = formData.howTo.filter(h => h.trim() !== '');
+    const cleanGalleryUrls = (formData.galleryUrls || []).filter(u => u.trim() !== '');
     
     // Ensure at least one benefit and one howTo
     if (cleanBenefits.length === 0 || cleanHowTo.length === 0) {
@@ -3515,6 +3518,7 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
       id: finalId,
       benefits: cleanBenefits,
       howTo: cleanHowTo,
+      galleryUrls: cleanGalleryUrls.length > 0 ? cleanGalleryUrls : undefined,
     };
     
     onSave(finalAsana);
@@ -3560,6 +3564,26 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
     const newHowTo = currentHowTo.filter((_, i) => i !== index);
     // Ensure at least one step remains
     setFormData({ ...formData, howTo: newHowTo.length > 0 ? newHowTo : [''] });
+  };
+
+  const addGalleryUrl = () => {
+    const currentUrls = formData.galleryUrls && formData.galleryUrls.length > 0 ? formData.galleryUrls : [''];
+    setFormData({ ...formData, galleryUrls: [...currentUrls, ''] });
+  };
+
+  const updateGalleryUrl = (index: number, value: string) => {
+    const currentUrls = formData.galleryUrls && formData.galleryUrls.length > 0 ? [...formData.galleryUrls] : [''];
+    if (index >= currentUrls.length) {
+      currentUrls.push('');
+    }
+    currentUrls[index] = value;
+    setFormData({ ...formData, galleryUrls: currentUrls });
+  };
+
+  const removeGalleryUrl = (index: number) => {
+    const currentUrls = formData.galleryUrls && formData.galleryUrls.length > 0 ? formData.galleryUrls : [''];
+    const newUrls = currentUrls.filter((_, i) => i !== index);
+    setFormData({ ...formData, galleryUrls: newUrls });
   };
 
   return (
@@ -3655,6 +3679,36 @@ const AsanaFormModal: React.FC<AsanaFormModalProps> = ({ asana, onSave, onClose 
               onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
               className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Gallery Images (Optional)</label>
+            {(formData.galleryUrls && formData.galleryUrls.length > 0 ? formData.galleryUrls : []).map((url, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <input
+                  type="url"
+                  value={url || ''}
+                  onChange={(e) => updateGalleryUrl(index, e.target.value)}
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  placeholder={`Gallery Image URL ${index + 1}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeGalleryUrl(index)}
+                  className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addGalleryUrl}
+              className="mt-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Gallery Image
+            </button>
           </div>
 
           <div>

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { isAdminEmail } from '../utils/admin';
 
 interface User {
@@ -36,11 +36,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (firebaseUser) {
         setIsAdminChecking(true);
         setIsAdmin(isAdminEmail(firebaseUser.email));
+        
+        // Restore plan from localStorage if available to prevent flash
+        let storedPlan: string | undefined;
+        try {
+          const stored = localStorage.getItem('yogaFlowUser');
+          if (stored) {
+             const parsed = JSON.parse(stored);
+             if (parsed.id === firebaseUser.uid) {
+                storedPlan = parsed.plan;
+             }
+          }
+        } catch (e) {
+          console.error('Error parsing stored user:', e);
+        }
+
         // User is signed in with Firebase
         const userData: User = {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || 'User',
           email: firebaseUser.email || '',
+          plan: storedPlan,
           joinDate: firebaseUser.metadata.creationTime || new Date().toISOString(),
         };
         setUser(userData);
@@ -137,6 +153,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => unsubscribe();
   }, []);
+
+  // Real-time listener for user profile updates (e.g. plan changes)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const userRef = doc(db, 'users', user.id);
+    const unsubscribe = onSnapshot(userRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        let plan = data.plan;
+
+        // If plan is missing in user doc, try to sync from subscription doc
+        if (!plan) {
+          try {
+            const subRef = doc(db, 'subscription', user.id);
+            const subSnap = await getDoc(subRef);
+            if (subSnap.exists()) {
+              const subData = subSnap.data();
+              // Check for active status or valid plan type
+              if (subData.planType && (subData.status === 'active' || subData.status === 'created' || subData.status === 'authenticated')) {
+                plan = subData.planType;
+                // Auto-fix the user document
+                setDoc(userRef, { 
+                  plan,
+                  planStatus: subData.status || 'active',
+                  planUpdatedAt: serverTimestamp()
+                }, { merge: true }).catch(console.error);
+              }
+            }
+          } catch (err) {
+            console.error('Error syncing subscription plan:', err);
+          }
+        }
+
+        setUser((prev) => {
+          if (!prev) return null;
+          // Avoid unnecessary updates if plan hasn't changed
+          if (prev.plan === plan) {
+            return prev;
+          }
+          const updatedUser = {
+            ...prev,
+            plan: plan,
+          };
+          localStorage.setItem('yogaFlowUser', JSON.stringify(updatedUser));
+          return updatedUser;
+        });
+        
+        // Update admin status if role changes in Firestore
+        const roleAdmin =
+          data?.role === 'admin' ||
+          data?.isAdmin === true ||
+          (Array.isArray(data?.roles) && data.roles.includes('admin'));
+          
+        setIsAdmin((prev) => {
+           // We can't easily access the current user email here to re-check isAdminEmail
+           // But normally admin status is stable. 
+           // If we want to be safe, we can just rely on the existing isAdmin state 
+           // and only update if Firestore explicitly grants/revokes admin.
+           // For now, let's just focus on the plan.
+           if (roleAdmin && !prev) return true;
+           return prev;
+        });
+      }
+    }, (error) => {
+      console.error("Error listening to user doc:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     // Check localStorage for existing users
