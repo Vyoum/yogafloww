@@ -95,6 +95,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab
                 if (!sub) return;
 
                 const currentEnd = typeof sub.current_end === 'number' ? sub.current_end : null;
+                const currentStart = typeof sub.current_start === 'number' ? sub.current_start : null;
+                const chargeAt = typeof sub.charge_at === 'number' ? sub.charge_at : null;
+                const startAt = typeof sub.start_at === 'number' ? sub.start_at : null;
                 const status = typeof sub.status === 'string' ? sub.status : null;
                 const planId = typeof sub.plan_id === 'string' ? sub.plan_id : null;
 
@@ -103,6 +106,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab
                     {
                         status: status || undefined,
                         razorpayPlanId: planId || undefined,
+                        razorpayCurrentStart: currentStart,
+                        razorpayChargeAt: chargeAt,
+                        razorpayStartAt: startAt,
                         currentPeriodEnd: currentEnd ? Timestamp.fromDate(new Date(currentEnd * 1000)) : undefined,
                         updatedAt: serverTimestamp(),
                     },
@@ -495,6 +501,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onBack, initialTab
                                                             <span className="text-slate-500">Status</span>
                                                             <span className="font-medium text-slate-900">{(subscription.status || 'unknown').toString()}</span>
                                                         </div>
+                                                        {(() => {
+                                                            const chargeAt = typeof subscription.razorpayChargeAt === 'number' ? subscription.razorpayChargeAt : null;
+                                                            const startAt = typeof subscription.razorpayStartAt === 'number' ? subscription.razorpayStartAt : null;
+                                                            const nextCharge = chargeAt || startAt;
+                                                            if (!nextCharge) return null;
+                                                            return (
+                                                                <div className="flex items-center justify-between gap-4">
+                                                                    <span className="text-slate-500">Next autopay charge</span>
+                                                                    <span className="font-medium text-slate-900">
+                                                                        {new Date(nextCharge * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })()}
                                                         <div className="flex items-center justify-between gap-4">
                                                             <span className="text-slate-500">Last payment ID</span>
                                                             <span className="font-medium text-slate-900 truncate max-w-[220px]">{(subscription.paymentId || 'N/A').toString()}</span>

@@ -105,7 +105,7 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
     return end;
   };
 
-  const saveSubscription = async (tier: PricingTier, paymentResponse: any, razorpay?: { subscriptionId?: string; planId?: string; currentEnd?: number; status?: string; }) => {
+  const saveSubscription = async (tier: PricingTier, paymentResponse: any, razorpay?: { subscriptionId?: string; planId?: string; currentEnd?: number; status?: string; startAt?: number; chargeAt?: number; currentStart?: number; }) => {
     if (!user?.id) return;
     const currentPeriodEnd = razorpay?.currentEnd
       ? new Date(Number(razorpay.currentEnd) * 1000)
@@ -119,6 +119,9 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
       paymentId: paymentResponse?.razorpay_payment_id ?? null,
       razorpaySubscriptionId: razorpay?.subscriptionId ?? paymentResponse?.razorpay_subscription_id ?? null,
       razorpayPlanId: razorpay?.planId ?? null,
+      razorpayStartAt: typeof razorpay?.startAt === 'number' ? razorpay.startAt : null,
+      razorpayChargeAt: typeof razorpay?.chargeAt === 'number' ? razorpay.chargeAt : null,
+      razorpayCurrentStart: typeof razorpay?.currentStart === 'number' ? razorpay.currentStart : null,
       planFrequency: tier.frequency ?? null,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -214,6 +217,9 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
             const currentEndSeconds = typeof sub?.current_end === 'number' && sub.current_end > 0
               ? sub.current_end
               : (typeof sub?.start_at === 'number' && sub.start_at > nowSeconds ? sub.start_at : fallbackTrialEnd);
+            const chargeAtSeconds = typeof sub?.charge_at === 'number' && sub.charge_at > 0
+              ? sub.charge_at
+              : (typeof sub?.start_at === 'number' && sub.start_at > 0 ? sub.start_at : null);
 
             await saveSubscription(
               tier,
@@ -223,6 +229,9 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
                 planId: sub?.plan_id,
                 currentEnd: currentEndSeconds,
                 status: sub?.status,
+                startAt: typeof sub?.start_at === 'number' ? sub.start_at : undefined,
+                chargeAt: typeof chargeAtSeconds === 'number' ? chargeAtSeconds : undefined,
+                currentStart: typeof sub?.current_start === 'number' ? sub.current_start : undefined,
               }
             );
 
@@ -484,12 +493,16 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
                   <h3 className={`text-2xl md:text-3xl font-serif font-bold mb-3 ${tier.isRecommended ? 'text-white' : 'text-slate-900'}`}>
                     {tier.name}
                   </h3>
-                  <div className="flex items-baseline gap-2">
+                  <button
+                    type="button"
+                    onClick={() => alert('We will revert back in 2–3 days.')}
+                    className="flex items-baseline gap-2 text-left"
+                  >
                     <span className="text-5xl md:text-6xl font-serif font-bold">{tier.price}</span>
                     <span className={`${tier.isRecommended ? 'text-teal-200/60' : 'text-slate-400'} text-sm font-medium tracking-widest uppercase`}>
                       {tier.frequency}
                     </span>
-                  </div>
+                  </button>
                 </div>
 
                 <div className={`h-px w-full mb-10 ${tier.isRecommended ? 'bg-white/10' : 'bg-slate-100'}`}></div>
@@ -539,7 +552,15 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
           <div className="mt-24 text-center">
               <div className="inline-block px-8 py-6 bg-teal-50/50 rounded-3xl border border-teal-100 max-w-2xl">
                 <p className="text-slate-600 text-sm leading-relaxed">
-                  Need extra guidance? 1-on-1 private sessions available for members at <span className="font-bold text-slate-900 border-b-2 border-teal-200 pb-0.5">$19/hr</span>.
+                  Need extra guidance? 1-on-1 private sessions available for members at{' '}
+                  <button
+                    type="button"
+                    onClick={() => alert('We will revert back in 2–3 days.')}
+                    className="font-bold text-slate-900 border-b-2 border-teal-200 pb-0.5"
+                  >
+                    $19/hr
+                  </button>
+                  .
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-6">
                    <div className="text-[10px] font-bold text-teal-600 uppercase tracking-widest flex items-center gap-2">
