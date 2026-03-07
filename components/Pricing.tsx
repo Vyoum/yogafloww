@@ -545,9 +545,13 @@ export const Pricing: React.FC<PricingProps> = ({ onShowLogin }) => {
                    <div className="text-[10px] font-bold text-teal-600 uppercase tracking-widest flex items-center gap-2">
                       <ShieldCheck size={14} /> Secure Payment
                    </div>
-                   <div className="text-[10px] font-bold text-teal-600 uppercase tracking-widest flex items-center gap-2">
+                   <button
+                     type="button"
+                     onClick={() => alert('We will revert back in 2–3 days.')}
+                     className="text-[10px] font-bold text-teal-600 uppercase tracking-widest flex items-center gap-2 hover:text-teal-700 transition-colors"
+                   >
                       <Zap size={14} /> Instant Access
-                   </div>
+                   </button>
                 </div>
               </div>
           </div>
