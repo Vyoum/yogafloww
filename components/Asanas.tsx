@@ -13,6 +13,7 @@ import {
   Zap, 
   Waves, 
   ChevronRight, 
+  Check, 
   Play, 
   Pause, 
   SkipForward, 
@@ -35,6 +36,7 @@ export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
   const [shouldNavigateToPricing, setShouldNavigateToPricing] = useState(false);
   const { isAuthenticated } = useAuth();
   const [asanas, setAsanas] = useState<Asana[]>(ASANAS);
+  const [selectedAsana, setSelectedAsana] = useState<Asana | null>(null);
 
   // Navigate to pricing after successful login if triggered from "Join Live Workshop"
   useEffect(() => {
@@ -43,6 +45,41 @@ export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
       onNavPricing();
     }
   }, [isAuthenticated, shouldNavigateToPricing, onNavPricing]);
+
+  useEffect(() => {
+    if (!selectedAsana) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedAsana(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedAsana]);
+
+  const getAsanaGallery = (asana: Asana) => {
+    const urls = Array.isArray((asana as any).galleryUrls) ? (asana as any).galleryUrls : [];
+    const cleaned = urls.filter((u: any) => typeof u === 'string' && u.trim()).map((u: string) => u.trim());
+    if (cleaned.length > 0) return cleaned.slice(0, 6);
+
+    const fallback = [
+      asana.imageUrl,
+      'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=1200',
+      'https://images.unsplash.com/photo-1599901860904-17e0ed3af3ea?auto=format&fit=crop&q=80&w=1200',
+    ].filter(Boolean) as string[];
+    return fallback;
+  };
+
+  const getCommonMistakes = (asana: Asana) => {
+    const mistakes = Array.isArray((asana as any).commonMistakes) ? (asana as any).commonMistakes : [];
+    const cleaned = mistakes.filter((m: any) => typeof m === 'string' && m.trim()).map((m: string) => m.trim());
+    if (cleaned.length > 0) return cleaned.slice(0, 5);
+    return ['Rounding the lower back', 'Shrugging shoulders toward ears', 'Locking the elbows'];
+  };
+
+  const getInstructorTip = (asana: Asana) => {
+    const tip = typeof (asana as any).instructorTip === 'string' ? (asana as any).instructorTip.trim() : '';
+    if (tip) return tip;
+    return `In ${asana.sanskritName}, ${asana.focusCue}`;
+  };
 
   useEffect(() => {
     const ref = collection(db, 'asanas');
@@ -235,7 +272,10 @@ export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
 
                   <div className="pt-6 border-t border-slate-50 flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{asana.category}</span>
-                    <button className="text-[10px] font-bold uppercase tracking-widest text-teal-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                    <button
+                      onClick={() => setSelectedAsana(asana)}
+                      className="text-[10px] font-bold uppercase tracking-widest text-teal-600 flex items-center gap-1 group-hover:gap-2 transition-all"
+                    >
                         Learn Technique <ChevronRight size={14} />
                     </button>
                   </div>
@@ -244,6 +284,107 @@ export const Asanas: React.FC<AsanasProps> = ({ onNavPricing }) => {
             </Reveal>
           ))}
         </div>
+
+        {selectedAsana && (
+          <div
+            className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center px-4 py-10"
+            onClick={() => setSelectedAsana(null)}
+          >
+            <div
+              className="w-full max-w-6xl bg-white rounded-[2.5rem] shadow-[0_60px_140px_-30px_rgba(0,0,0,0.6)] overflow-hidden border border-white/20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="grid lg:grid-cols-[360px_1fr_360px]">
+                <div className="p-8 border-b lg:border-b-0 lg:border-r border-slate-100">
+                  <div className="flex items-start justify-between gap-6">
+                    <div className="min-w-0">
+                      <h3 className="text-2xl md:text-3xl font-serif font-bold text-slate-900 tracking-tight truncate">
+                        {selectedAsana.sanskritName}
+                      </h3>
+                      <p className="text-sm text-teal-700 font-medium mt-1">{selectedAsana.englishName}</p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedAsana(null)}
+                      className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center shrink-0"
+                      aria-label="Close"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="mt-7 space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                    {getAsanaGallery(selectedAsana).map((url, idx) => (
+                      <div key={`${url}-${idx}`} className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50">
+                        <div className="aspect-[16/10]">
+                          <img src={url} alt={`${selectedAsana.englishName} ${idx + 1}`} className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-8 border-b lg:border-b-0 lg:border-r border-slate-100">
+                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.35em] text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+                    The Technique
+                  </div>
+
+                  <div className="mt-8 space-y-7">
+                    {(selectedAsana.howTo || []).map((step, idx) => (
+                      <div key={idx} className="flex items-start gap-4">
+                        <div className="w-8 h-8 rounded-full bg-teal-50 text-teal-700 flex items-center justify-center font-bold text-xs shrink-0">
+                          {idx + 1}
+                        </div>
+                        <p className="text-sm text-slate-700 leading-relaxed">{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.35em] text-slate-500">
+                    <Check size={14} className="text-teal-600" />
+                    Key Benefits
+                  </div>
+
+                  <ul className="mt-6 space-y-3">
+                    {(selectedAsana.benefits || []).map((b, idx) => (
+                      <li key={idx} className="text-sm text-slate-700 flex items-start gap-3">
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-2 shrink-0"></span>
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-8 p-5 rounded-2xl border border-rose-100 bg-rose-50">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.35em] text-rose-700">
+                      Common Mistakes
+                    </div>
+                    <ul className="mt-4 space-y-2">
+                      {getCommonMistakes(selectedAsana).map((m, idx) => (
+                        <li key={idx} className="text-xs text-rose-700 flex items-start gap-2">
+                          <span className="mt-0.5 text-rose-400">
+                            <X size={14} />
+                          </span>
+                          <span>{m}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="mt-6 p-6 rounded-2xl bg-slate-900 text-white shadow-[0_20px_60px_-25px_rgba(0,0,0,0.6)]">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.35em] text-teal-300">
+                      Pro Instructor Tip
+                    </div>
+                    <p className="mt-3 text-sm text-slate-200 leading-relaxed">
+                      {getInstructorTip(selectedAsana)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* --- Section 2: Meditation Library --- */}
         <div className="pt-24 border-t border-slate-100">

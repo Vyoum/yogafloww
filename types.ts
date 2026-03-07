@@ -139,6 +139,9 @@ export interface Asana {
   howTo: string[];
   focusCue: string;
   imageUrl?: string;
+  galleryUrls?: string[];
+  commonMistakes?: string[];
+  instructorTip?: string;
   deleted?: boolean;
 }
 
