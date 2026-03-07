@@ -366,7 +366,7 @@ export const Classes: React.FC<ClassesProps> = ({ initialTab = 'live', onNavHome
                   <Sparkles className="text-teal-600" size={40} />
                 </div>
                 <h2 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 mb-4 md:mb-6">
-                  Coming <span className="text-teal-600 italic">Soon</span>
+                  Classes Starting From <span className="text-teal-600 italic">15th March</span>
                 </h2>
                 <p className="text-lg md:text-xl text-slate-600 max-w-md mx-auto font-light leading-relaxed">
                   We're preparing something special for you. Classes will be available soon.
